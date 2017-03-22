@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openerp>
+    <data>
+
+<record id="amazon_backend_view_tree" model="ir.ui.view">
+    <field name="model">amazon.backend</field>
+    <field name="arch" type="xml">
+        <tree string="Amazon">
+            <field name="name"/>
+        </tree>
+    </field>
+</record>
+
+<record id="amazon_backend_view_form" model="ir.ui.view">
+    <field name="model">amazon.backend</field>
+    <field name="arch" type="xml">
+        <form string="Amazon">
+            <sheet>
+                <label for="name" class="oe_edit_only"/>
+                <h1>
+                    <field name="name" class="oe_inline"/>
+                </h1>
+                <group>
+                    <field name="marketplace"/>
+                    <field name="merchant"/>
+                    <field name="accesskey"/>
+                    <field name="password" String="Secret Key"/>
+                    <field name="uri"/>
+                </group>
+            </sheet>
+        </form>
+    </field>
+</record>
+
+<record id="amazon_backend_view_search" model="ir.ui.view">
+    <field name="model">amazon.backend</field>
+    <field name="arch" type="xml">
+        <search string="Amazon">
+            <field name="name"/>
+        </search>
+    </field>
+</record>
+
+<record model="ir.actions.act_window" id="act_open_amazon_backend_view">
+    <field name="name">Backend</field>
+    <field name="type">ir.actions.act_window</field>
+    <field name="res_model">amazon.backend</field>
+    <field name="view_type">form</field>
+    <field name="view_mode">tree,form</field>
+    <field name="search_view_id" ref="amazon_backend_view_search"/>
+    <field name="domain">[]</field>
+    <field name="context">{}</field>
+</record>
+
+<record model="ir.actions.act_window.view" id="act_open_amazon_backend_view_form">
+    <field name="act_window_id" ref="act_open_amazon_backend_view"/>
+    <field name="sequence" eval="20"/>
+    <field name="view_mode">form</field>
+    <field name="view_id" ref="amazon_backend_view_form"/>
+</record>
+
+<record model="ir.actions.act_window.view" id="act_open_amazon_backend_view_tree">
+    <field name="act_window_id" ref="act_open_amazon_backend_view"/>
+    <field name="sequence" eval="10"/>
+    <field name="view_mode">tree</field>
+    <field name="view_id" ref="amazon_backend_view_tree"/>
+</record>
+
+<menuitem id="menu_amazon_root"
+    name="Amazon"
+    parent="connector.menu_connector_root"
+    sequence="20"/>
+
+<menuitem id="menu_amazon_backend"
+    parent="menu_amazon_root"
+    sequence="20"
+    action="act_open_amazon_backend_view"/>
+
+    </data>
+</openerp>
