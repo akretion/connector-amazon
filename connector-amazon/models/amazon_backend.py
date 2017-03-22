@@ -3,16 +3,22 @@
 # @author Sébastien BEAU <sebastien.beau@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
+import iso8601
+import base64
+import time
 
 from openerp import api, fields, models
 from boto.mws.connection import MWSConnection
 from openerp.tools.config import config
+import logging
+_logger = logging.getLogger(__name__)
 
 
 class AmazonBackend(models.Model):
     _name = 'amazon.backend'
     _inherit = 'keychain.backend'
     _backend_name = 'amazon'
+    _report_per_page = 50
 
     name = fields.Char()
     accesskey = fields.Char(
@@ -25,6 +31,84 @@ class AmazonBackend(models.Model):
     marketplace = fields.Char(
         sparse="data",
         required=True)
-    uri = fields.Char(
-        sparse="data",
+    host = fields.Selection(
+        selection=[
+            ('mws.amazonservices.com', 'North America (NA)'),
+            ('mws-eu.amazonservices.com', 'Europe (EU)'),
+            ('mws.amazonservices.in', 'India (IN)'),
+            ('mws.amazonservices.com.cn', 'China (CN)'),
+            ('mws.amazonservices.jp', 'Japan (JP)'),
+            ],
         required=True)
+    import_report_from = fields.Datetime(string="Import From")
+
+    def _get_list_of_report(self):
+        return [
+            '_GET_FLAT_FILE_ORDERS_DATA_',
+            '_GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2_',
+            ]
+    def _get_connection(self):
+        self.ensure_one()
+        account = self._get_existing_keychain()
+        return MWSConnection(
+            self.accesskey,
+            account.get_password(),
+            Merchant=self.merchant,
+            host=self.host)
+
+    def _prepare_attachment(self, report):
+        return {
+            'name': report.ReportId,
+            'amazon_report_id': report.ReportId,
+            'datas_fname': report.ReportId + ".csv",
+            'state': 'pending',
+            'sync_date': iso8601.parse_date(report.AvailableDate),
+            'file_type': report.ReportType,
+            'amazon_backend_id': self.id,
+            }
+
+    @api.multi
+    def _import_report_id(self, mws, report):
+        # TODO check if report already exist
+        attch_obj = self.env['ir.attachment.metadata']
+        if attch_obj.search([
+                ('amazon_backend_id', '=', self.id),
+                ('name', '=', report.ReportId)]):
+            _logger.debug("Report %s already exist, skip it" % report.ReportId)
+        else:
+            _logger.debug("Import Report %s" % report.ReportId)
+            try:
+                data = mws.get_report(ReportId=report.ReportId)
+            except Exception, e:
+                if e.error_code == 'RequestThrottled':
+                    _logger.info(
+                        "Request Throttled, please wait before auto retrying")
+                    time.sleep(60)
+                    _logger.debug("Import Report %s" % report.ReportId)
+                    data = mws.get_report(ReportId=report.ReportId)
+                else:
+                    raise
+            vals = self._prepare_attachment(report)
+            vals['datas'] = base64.encodestring(data)
+            self.env['ir.attachment.metadata'].create(vals)
+            # Warning, we volontary commit here the report imported
+            # this avoid useless re-importing it if the process failed
+            self._cr.commit()
+
+    @api.multi
+    def import_report(self):
+        for record in self:
+            mws = record._get_connection()
+            kwargs = {'ReportTypeList': self._get_list_of_report()}
+            start = fields.Datetime.from_string(self.import_report_from)
+            if start:
+                # Be carefull Amazon documentation is outdated
+                # the key for filtering the date is AvailableFromDate
+                # and not RequestedFromDate
+                kwargs['AvailableFromDate'] = start.isoformat()
+            stop = None
+            for response in mws.iter_call('GetReportList', **kwargs):
+                for report in response._result.ReportInfo:
+                    self._import_report_id(mws, report)
+                    stop = max(report.AvailableDate, stop)
+            record.import_report_from = iso8601.parse_date(stop)

@@ -2,3 +2,4 @@
 
 from . import amazon_backend
 from . import keychain
+from . import attachment

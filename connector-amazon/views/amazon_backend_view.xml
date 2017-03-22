@@ -20,12 +20,16 @@
                 <h1>
                     <field name="name" class="oe_inline"/>
                 </h1>
-                <group>
+                <group string="Configuration" name="config">
+                    <field name="host"/>
                     <field name="marketplace"/>
                     <field name="merchant"/>
                     <field name="accesskey"/>
                     <field name="password" String="Secret Key"/>
-                    <field name="uri"/>
+                </group>
+                <group string="Action" name="action" colrow="40">
+                        <field name="import_report_from"/>
+                        <button name="import_report" type="object" string="Import Report"/>
                 </group>
             </sheet>
         </form>
@@ -66,6 +70,17 @@
     <field name="view_id" ref="amazon_backend_view_tree"/>
 </record>
 
+<record model="ir.actions.act_window" id="act_open_amazon_file_view">
+    <field name="name">File</field>
+    <field name="type">ir.actions.act_window</field>
+    <field name="res_model">ir.attachment.metadata</field>
+    <field name="view_type">form</field>
+    <field name="view_mode">tree,form</field>
+    <field name="search_view_id"
+           ref="attachment_base_synchronize.view_external_attachment_search"/>
+    <field name="domain">[('amazon_backend_id', '!=', False)]</field>
+</record>
+
 <menuitem id="menu_amazon_root"
     name="Amazon"
     parent="connector.menu_connector_root"
@@ -75,6 +90,11 @@
     parent="menu_amazon_root"
     sequence="20"
     action="act_open_amazon_backend_view"/>
+
+<menuitem id="menu_amazon_file"
+    parent="menu_amazon_root"
+    sequence="30"
+    action="act_open_amazon_file_view"/>
 
     </data>
 </openerp>
