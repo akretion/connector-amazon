@@ -10,6 +10,7 @@ import time
 from openerp import api, fields, models
 from boto.mws.connection import MWSConnection
 from openerp.tools.config import config
+from .attachment import REPORT_SUPPORTED
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -42,11 +43,6 @@ class AmazonBackend(models.Model):
         required=True)
     import_report_from = fields.Datetime(string="Import From")
 
-    def _get_list_of_report(self):
-        return [
-            '_GET_FLAT_FILE_ORDERS_DATA_',
-            '_GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2_',
-            ]
     def _get_connection(self):
         self.ensure_one()
         account = self._get_existing_keychain()
@@ -99,7 +95,7 @@ class AmazonBackend(models.Model):
     def import_report(self):
         for record in self:
             mws = record._get_connection()
-            kwargs = {'ReportTypeList': self._get_list_of_report()}
+            kwargs = {'ReportTypeList': REPORT_SUPPORTED.keys()}
             start = fields.Datetime.from_string(self.import_report_from)
             if start:
                 # Be carefull Amazon documentation is outdated
