@@ -13,4 +13,3 @@ class AmazonPaymentImporter(models.AbstractModel):
     def _run(self, report):
         # TODO process the report and generate the payment
         pass
-

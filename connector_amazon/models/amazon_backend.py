@@ -3,16 +3,23 @@
 # @author Sébastien BEAU <sebastien.beau@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-import iso8601
 import base64
 import time
 
 from openerp import api, fields, models
-from boto.mws.connection import MWSConnection
-from openerp.tools.config import config
 from .attachment import REPORT_SUPPORTED
 import logging
 _logger = logging.getLogger(__name__)
+
+try:
+    import iso8601
+except ImportError:
+    _logger.debug('Cannot `import iso8601`.')
+
+try:
+    from boto.mws.connection import MWSConnection
+except ImportError:
+    _logger.debug('Cannot `import boto`.')
 
 
 class AmazonBackend(models.Model):
