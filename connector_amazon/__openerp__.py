@@ -14,7 +14,10 @@
     "application": False,
     "installable": True,
     "external_dependencies": {
-        "python": [],
+        "python": [
+            'boto',
+            'iso8601',
+            ],
         "bin": [],
     },
     "depends": [
@@ -22,7 +25,6 @@
         "base_sparse_field",
         "keychain",
         "attachment_base_synchronize",
-
     ],
     "data": [
         "views/amazon_backend_view.xml",
