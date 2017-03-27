@@ -8,7 +8,7 @@ from openerp import models
 
 
 class AmazonSaleImporter(models.AbstractModel):
-    _name = 'Amazon.sale.importer'
+    _name = 'amazon.sale.importer'
     _description = 'Amazon Sale Importer'
 
     def _run(self, report):

@@ -22,7 +22,7 @@ class IrAttachmentMetadata(models.Model):
 
     _sql_constraints = [
         ('uniq_report_per_backend',
-         'uniq(amazon_backend_id, amazon_report_id)',
+         'unique(amazon_backend_id, amazon_report_id)',
          'Amazon Report must be uniq per backend')]
 
     def _run(self):
