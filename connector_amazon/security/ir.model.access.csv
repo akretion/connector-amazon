@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_amazon_product,amazon product connector manager,model_amazon_product,connector.group_connector_manager,1,1,1,1
+access_amazon_employee,access_amazon_employee,model_amazon_product,base.group_user,1,0,0,0

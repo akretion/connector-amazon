@@ -83,7 +83,7 @@
 
 <menuitem id="menu_amazon_root"
     name="Amazon"
-    parent="base.menu_base_config"
+    parent="connector.menu_connector_root"
     sequence="20"/>
 
 <menuitem id="menu_amazon_backend"
