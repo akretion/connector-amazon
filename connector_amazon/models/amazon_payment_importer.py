@@ -7,7 +7,7 @@ from openerp import models
 
 
 class AmazonPaymentImporter(models.AbstractModel):
-    _name = 'Amazon.payment.importer'
+    _name = 'amazon.payment.importer'
     _description = 'Amazon Payment Importer'
 
     def _run(self, report):
