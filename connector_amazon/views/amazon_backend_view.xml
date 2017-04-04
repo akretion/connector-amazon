@@ -21,11 +21,18 @@
                     <field name="name" class="oe_inline"/>
                 </h1>
                 <group string="Configuration" name="config">
-                    <field name="host"/>
-                    <field name="marketplace"/>
-                    <field name="merchant"/>
-                    <field name="accesskey"/>
-                    <field name="password" String="Secret Key"/>
+                    <group>
+                        <field name="host"/>
+                        <field name="pricelist_id"/>
+                        <field name="sale_prefix"/>
+                        <field name="marketplace"/>
+                    </group>
+                    <group>
+                        <field name="merchant"/>
+                        <field name="encoding"/>
+                        <field name="accesskey"/>
+                        <field name="password" String="Secret Key"/>
+                    </group>
                 </group>
                 <group string="Action" name="action" colrow="40">
                         <field name="import_report_from"/>

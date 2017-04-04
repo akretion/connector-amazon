@@ -17,7 +17,7 @@
         "python": [
             'boto',
             'iso8601',
-            ],
+        ],
         "bin": [],
     },
     "depends": [
@@ -33,6 +33,9 @@
     "data": [
         "views/amazon_backend_view.xml",
         "views/product_view.xml",
+        "views/partner_view.xml",
+        "views/sale_view.xml",
+        "views/metadata_view.xml",
         "security/ir.model.access.csv",
     ],
     "demo": [

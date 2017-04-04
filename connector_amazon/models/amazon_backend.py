@@ -29,16 +29,17 @@ class AmazonBackend(models.Model):
     _report_per_page = 50
 
     name = fields.Char()
+    sale_prefix = fields.Char(
+        string='Sale Prefix',
+        help="Prefix applied in Sale Order (field 'name')")
+    pricelist_id = fields.Many2one(
+        comodel_name='product.pricelist', string='Pricelist', required=True)
     accesskey = fields.Char(
-        sparse="data",
-        required=True,
-        string="Access Key")
+        sparse="data", required=True, string="Access Key")
     merchant = fields.Char(
-        sparse="data",
-        required=True)
+        sparse="data", required=True)
     marketplace = fields.Char(
-        sparse="data",
-        required=True)
+        sparse="data", required=True)
     host = fields.Selection(
         selection=[
             ('mws.amazonservices.com', 'North America (NA)'),
@@ -46,8 +47,12 @@ class AmazonBackend(models.Model):
             ('mws.amazonservices.in', 'India (IN)'),
             ('mws.amazonservices.com.cn', 'China (CN)'),
             ('mws.amazonservices.jp', 'Japan (JP)'),
-            ],
-        required=True)
+        ], required=True)
+    encoding = fields.Selection(
+        selection=[
+            ('ISO-8859-15', 'ISO-8859-15'),
+            ('UTF-8', 'UTF-8'),
+        ], required=True)
     import_report_from = fields.Datetime(string="Import From")
 
     def _get_connection(self):
@@ -68,7 +73,7 @@ class AmazonBackend(models.Model):
             'sync_date': iso8601.parse_date(report.AvailableDate),
             'file_type': report.ReportType,
             'amazon_backend_id': self.id,
-            }
+        }
 
     @api.multi
     def _import_report_id(self, mws, report):
