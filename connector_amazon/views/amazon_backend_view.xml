@@ -54,7 +54,7 @@
 </record>
 
 <record model="ir.actions.act_window" id="act_open_amazon_backend_view">
-    <field name="name">Backend</field>
+    <field name="name">Backends</field>
     <field name="type">ir.actions.act_window</field>
     <field name="res_model">amazon.backend</field>
     <field name="view_type">form</field>
@@ -79,7 +79,7 @@
 </record>
 
 <record model="ir.actions.act_window" id="act_open_amazon_file_view">
-    <field name="name">File</field>
+    <field name="name">Files</field>
     <field name="type">ir.actions.act_window</field>
     <field name="res_model">ir.attachment.metadata</field>
     <field name="view_type">form</field>

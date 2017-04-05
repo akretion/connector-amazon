@@ -94,8 +94,9 @@ class AmazonSaleImporter(models.AbstractModel):
             'name': '[%s] %s' % (line['sku'], line['product-name']),
             'product_uom_qty': line['quantity-purchased'],
             # price is in full tax, vat is computed in odoo
-            'price_unit': line['item-price'] + line['item-tax'],
-            'shipping': line['shipping-price'] + line['shipping-tax'],
+            'price_unit': float(line['item-price']) + float(line['item-tax']),
+            'shipping': float(line['shipping-price']) + \
+            float(line['shipping-tax']),
         }
 
     def _create_sales(self, sales, meta_attachment):

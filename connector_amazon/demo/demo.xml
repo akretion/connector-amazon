@@ -6,7 +6,17 @@
         <field name="name">Amazon Sale file example</field>
         <field name="state">pending</field>
         <field name="type">binary</field>
+        <field name="file_type">_GET_FLAT_FILE_ORDERS_DATA_</field>
+        <field name="datas" type="base64" file="connector_amazon/demo/56460amz.csv"/>
+        <field name="datas_fname">56460amz</field>
         <field name="amazon_backend_id" ref="connector_amazon.amazon_main_backend"/>
+        <field name="amazon_report_id">56460amz</field>
+    </record>
+
+    <record id="amazon_product_demo" model="amazon.product">
+        <field name="backend_id" ref="connector_amazon.amazon_main_backend"/>
+        <field name="record_id" ref="product.product_product_8"/>
+        <field name="external_id">QS58LMU</field>
     </record>
 
 </data>
