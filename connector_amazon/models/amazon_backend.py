@@ -40,6 +40,8 @@ class AmazonBackend(models.Model):
         sparse="data", required=True)
     marketplace = fields.Char(
         sparse="data", required=True)
+    shipping_product = fields.Many2one(
+        comodel_name='product.product', string='Shipping Product', required=True)
     host = fields.Selection(
         selection=[
             ('mws.amazonservices.com', 'North America (NA)'),

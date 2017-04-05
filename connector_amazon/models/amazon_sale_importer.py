@@ -52,7 +52,7 @@ class AmazonSaleImporter(models.AbstractModel):
                 continue
             if line['order-id'] in sales:
                 vals = sales[line['order-id']]
-                vals['lines'].append(self._add_sale_line(line))
+                vals['lines'].append(self._get_sale_line(line))
             else:
                 vals = {
                     'sale': {
@@ -76,44 +76,54 @@ class AmazonSaleImporter(models.AbstractModel):
                         'zip': reset_empty(line['ship-postal-code']),
                         'country': line['ship-country'],
                     },
-                    'lines': [self._add_sale_line(line)],
+                    'lines': [self._get_sale_line(line)],
                 }
             sales[line['order-id']] = vals
         return sales
 
-    def _add_sale_line(self, line):
+    def _get_sale_line(self, line):
         return {
             'item': line['order-item-id'],
             'default_code': line['sku'],
             'name': line['product-name'],
-            'quantity': line['quantity-purchased'],
-            'price': line['item-price'],
+            'product_uom_qty': line['quantity-purchased'],
+            'price_unit': line['item-price'],
             'tax': line['item-tax'],
-            'port': line['shipping-price'],
+            'shipping': line['shipping-price'],
+            # on the line or on the sale ??
             'instruction': line['delivery-Instructions'],
         }
 
-    def _create_sales(self, sales, meta_attach):
+    def _create_sales(self, sales, meta_attachment):
         """ We process all sale orders of the file
         """
+        backend = meta_attachment.amazon_backend_id
         for order_item, sale in sales.items():
             partner, part_ship = self._get_partners(sale)
             vals = {
                 'name': '%s %s' % (
-                    meta_attach.amazon_backend_id.sale_prefix or '',
+                    backend.sale_prefix or '',
                     sale['sale']['origin']),
                 'partner_id': partner.id,
                 'partner_shipping_id': part_ship.id,
-                'pricelist_id': meta_attach.amazon_backend_id.pricelist_id.id,
+                'pricelist_id': backend.pricelist_id.id,
                 'external_origin': 'ir.attachment.metadata,%s'
-                % meta_attach.id,
+                % meta_attachment.id,
                 'origin': sale['sale']['origin'],
             }
             if sale.get('lines'):
-                self._complete_products(sale['lines'])
+                ship_price = self._complete_products(sale['lines'], backend)
                 vals['order_line'] = [
-                    (0, _, {key: val for key, val in line.items()})
+                    (0, '_', {key: val for key, val in line.items()})
                     for line in sale['lines']]
+                if ship_price:
+                    # import pdb; pdb.set_trace()
+                    ship_vals = {
+                        'product_uom_qty': 1,
+                        'price_unit': ship_price,
+                        'product_id': backend.shipping_product.id,
+                    }
+                    vals['order_line'].append((0, '_', ship_vals), )
             self.env['sale.order'].create(vals)
 
     def _get_partners(self, sale):
@@ -123,8 +133,13 @@ class AmazonSaleImporter(models.AbstractModel):
         partner = partner_m.search(
             [('email', '=', sale['partner']['email'])])
         part_ship = False
+        sale['part_ship']['country_id'], sale['part_ship']['state_id'] = \
+            self._get_state_country(sale)
         if partner:
-            part_ship = self._search_shipping_partner(sale, partner_m)
+            part_ship = partner_m.search([
+                (fieldname, '=', val)
+                for fieldname, val in sale['part_ship'].items()
+                if fieldname in partner_m._fields])
         else:
             partner = partner_m.create(sale['partner'])
         if not part_ship:
@@ -134,31 +149,25 @@ class AmazonSaleImporter(models.AbstractModel):
             part_ship = partner_m.create(vals)
         return (partner[0], part_ship[0])
 
-    def _search_shipping_partner(self, sale, partner_m):
-        ship = sale['part_ship']
-        sale['part_ship']['country_id'], sale['part_ship']['state_id'] = \
-            self._get_state_country(sale)
-        domain = [
-            (fieldname, '=', val)
-            for fieldname, val in ship.items()
-            if fieldname in partner_m._fields]
-        return partner_m.search(domain)
-
-    def _complete_products(self, lines):
-        count_line = 0
+    def _complete_products(self, lines, backend):
+        line_count, shipping_price = 0, 0
         products_in_exception = []
         for line in lines:
+            shipping_line = float(line.get('shipping'))
+            if shipping_line:
+                shipping_price += shipping_line
             product = self.env['product.product'].search(
                 [('default_code', '=', line['default_code'])])
             if product:
-                lines[count_line]['product_id'] = product.id
+                lines[line_count]['product_id'] = product.id
             else:
                 products_in_exception.append(line['default_code'])
-            count_line += 1
+            line_count += 1
         if products_in_exception:
             raise UserError(
                 _("No matching product with these sku/default_code '%s'"
                   % products_in_exception))
+        return shipping_price
 
     def _get_state_country(self, sale):
         """ country is mandatory, not state

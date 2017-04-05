@@ -25,6 +25,7 @@
                         <field name="host"/>
                         <field name="pricelist_id"/>
                         <field name="sale_prefix"/>
+                        <field name="shipping_product"/>
                         <field name="marketplace"/>
                     </group>
                     <group>
