@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openerp>
+<data noupdate="1">
+
+    <record id="amazon_main_backend" model="amazon.backend">
+        <field name="name">Amazon EU</field>
+        <field name="sale_prefix">AmzEU</field>
+        <field name="host">mws-eu.amazonservices.com</field>
+        <field name="marketplace">Your key</field>
+        <field name="merchant">Your key</field>
+        <field name="encoding">ISO-8859-15</field>
+        <field name="accesskey">Your key</field>
+        <field name="password">Your key</field>
+        <field name="shipping_product" ref="product.product_product_consultant"/>
+        <field name="pricelist_id" ref="product.list0"/>
+    </record>
+
+</data>
+</openerp>

@@ -26,11 +26,11 @@
                         <field name="pricelist_id"/>
                         <field name="sale_prefix"/>
                         <field name="shipping_product"/>
-                        <field name="marketplace"/>
+                        <field name="encoding"/>
                     </group>
                     <group>
+                        <field name="marketplace"/>
                         <field name="merchant"/>
-                        <field name="encoding"/>
                         <field name="accesskey"/>
                         <field name="password" String="Secret Key"/>
                     </group>

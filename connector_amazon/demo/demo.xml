@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openerp>
+<data>
+
+    <record id="amazon_sale_demo" model="ir.attachment.metadata">
+        <field name="name">Amazon Sale file example</field>
+        <field name="state">pending</field>
+        <field name="type">binary</field>
+        <field name="amazon_backend_id" ref="connector_amazon.amazon_main_backend"/>
+    </record>
+
+</data>
+</openerp>

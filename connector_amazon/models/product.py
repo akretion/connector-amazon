@@ -10,18 +10,18 @@ class ProductProduct(models.Model):
     _inherit = 'product.product'
 
     amazon_bind_ids = fields.One2many(
-        'amazon.product',
-        'record_id',
-        'Amazon Binding')
+        comodel_name='amazon.product',
+        inverse_name='record_id',
+        string='Amazon Binding')
 
 
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
     amazon_variant_bind_ids = fields.One2many(
-        'amazon.product',
-        'product_tmpl_id',
-        'Amazon Binding')
+        comodel_name='amazon.product',
+        inverse_name='product_tmpl_id',
+        string='Amazon Binding')
 
 
 class AmazonProduct(models.Model):
@@ -30,15 +30,17 @@ class AmazonProduct(models.Model):
     _description = 'Amazon Product'
 
     record_id = fields.Many2one(
-        'product.product',
-        'Product')
-    external_id = fields.Char(required=True)
+        comodel_name='product.product',
+        string='Product')
+    external_id = fields.Char(
+        string='SKU',
+        help="Code/sku of the product in the marketplace")
     backend_id = fields.Many2one(
-        'amazon.backend',
-        'Backend',
+        comodel_name='amazon.backend',
+        string='Backend',
         required=True)
 
     _sql_constraints = [
         ('external_id_uniq', 'unique(backend_id, external_id)',
          'A product can only have one external id by backend.'),
-        ]
+    ]

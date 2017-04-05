@@ -7,6 +7,8 @@ import base64
 import time
 
 from openerp import api, fields, models
+from openerp.exceptions import Warning as UserError
+
 from .attachment import REPORT_SUPPORTED
 import logging
 _logger = logging.getLogger(__name__)
@@ -14,12 +16,12 @@ _logger = logging.getLogger(__name__)
 try:
     import iso8601
 except ImportError:
-    _logger.debug('Cannot `import iso8601`.')
+    _logger.debug('Cannot `import iso8601` library.')
 
 try:
     from boto.mws.connection import MWSConnection
 except ImportError:
-    _logger.debug('Cannot `import boto`.')
+    _logger.debug('Cannot `import boto` library.')
 
 
 class AmazonBackend(models.Model):
@@ -41,7 +43,8 @@ class AmazonBackend(models.Model):
     marketplace = fields.Char(
         sparse="data", required=True)
     shipping_product = fields.Many2one(
-        comodel_name='product.product', string='Shipping Product', required=True)
+        comodel_name='product.product', string='Shipping Product',
+        required=True)
     host = fields.Selection(
         selection=[
             ('mws.amazonservices.com', 'North America (NA)'),
@@ -108,17 +111,20 @@ class AmazonBackend(models.Model):
     @api.multi
     def import_report(self):
         for record in self:
-            mws = record._get_connection()
-            kwargs = {'ReportTypeList': REPORT_SUPPORTED.keys()}
-            start = fields.Datetime.from_string(self.import_report_from)
-            if start:
-                # Be carefull Amazon documentation is outdated
-                # the key for filtering the date is AvailableFromDate
-                # and not RequestedFromDate
-                kwargs['AvailableFromDate'] = start.isoformat()
-            stop = None
-            for response in mws.iter_call('GetReportList', **kwargs):
-                for report in response._result.ReportInfo:
-                    self._import_report_id(mws, report)
-                    stop = max(report.AvailableDate, stop)
-            record.import_report_from = iso8601.parse_date(stop)
+            try:
+                mws = record._get_connection()
+                kwargs = {'ReportTypeList': REPORT_SUPPORTED.keys()}
+                start = fields.Datetime.from_string(self.import_report_from)
+                if start:
+                    # Be carefull Amazon documentation is outdated
+                    # the key for filtering the date is AvailableFromDate
+                    # and not RequestedFromDate
+                    kwargs['AvailableFromDate'] = start.isoformat()
+                stop = None
+                for response in mws.iter_call('GetReportList', **kwargs):
+                    for report in response._result.ReportInfo:
+                        self._import_report_id(mws, report)
+                        stop = max(report.AvailableDate, stop)
+                record.import_report_from = iso8601.parse_date(stop)
+            except Exception as e:
+                raise UserError(u"Amazon response:\n\n%s" % e)

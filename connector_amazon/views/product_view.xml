@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <openerp>
-    <data>
+<data>
 
 <record id="view_product_template_form" model="ir.ui.view">
     <field name="model">product.template</field>
@@ -14,10 +14,9 @@
                 <field name="amazon_variant_bind_ids" nolabel="1">
                     <tree editable="bottom">
                         <field name="backend_id"/>
-                        <field
-                            name="record_id"
-                            options="{'create': false, 'create_edit': false}"
-                            domain="[('product_tmpl_id', '=', parent.id)]"
+                        <field name="record_id"
+                               options="{'create': false, 'create_edit': false}"
+                               domain="[('product_tmpl_id', '=', parent.id)]"
                             />
                         <field name="external_id"/>
                     </tree>
@@ -27,5 +26,5 @@
     </field>
 </record>
 
-    </data>
+</data>
 </openerp>

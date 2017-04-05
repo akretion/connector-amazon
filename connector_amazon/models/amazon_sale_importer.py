@@ -4,10 +4,17 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 import StringIO
-import unicodecsv
+import logging
 
 from openerp import _, models
 from openerp.exceptions import Warning as UserError
+
+_logger = logging.getLogger(__name__)
+
+try:
+    import unicodecsv
+except (ImportError, IOError) as err:
+    _logger.debug(err)
 
 
 class AmazonSaleImporter(models.AbstractModel):
@@ -67,7 +74,6 @@ class AmazonSaleImporter(models.AbstractModel):
                     'part_ship': {
                         'name': line['recipient-name'],
                         'phone': reset_empty(line['ship-phone-number']),
-                        # TODO use with split address
                         'street': reset_empty(line['ship-address-1']),
                         'street2': reset_empty(line['ship-address-2']),
                         'street3': reset_empty(line['ship-address-3']),
@@ -84,14 +90,12 @@ class AmazonSaleImporter(models.AbstractModel):
     def _get_sale_line(self, line):
         return {
             'item': line['order-item-id'],
-            'default_code': line['sku'],
-            'name': line['product-name'],
+            'sku': line['sku'],
+            'name': '[%s] %s' % (line['sku'], line['product-name']),
             'product_uom_qty': line['quantity-purchased'],
-            'price_unit': line['item-price'],
-            'tax': line['item-tax'],
-            'shipping': line['shipping-price'],
-            # on the line or on the sale ??
-            'instruction': line['delivery-Instructions'],
+            # price is in full tax, vat is computed in odoo
+            'price_unit': line['item-price'] + line['item-tax'],
+            'shipping': line['shipping-price'] + line['shipping-tax'],
         }
 
     def _create_sales(self, sales, meta_attachment):
@@ -136,6 +140,11 @@ class AmazonSaleImporter(models.AbstractModel):
         sale['part_ship']['country_id'], sale['part_ship']['state_id'] = \
             self._get_state_country(sale)
         if partner:
+            # not existing street3 in odoo
+            if sale['part_ship'].get('street3') and 'street3' not in \
+                    partner_m._fields:
+                sale['part_ship']['street2'] = '%s %s' % (
+                    sale['part_ship']['street2'], sale['part_ship']['street3'])
             part_ship = partner_m.search([
                 (fieldname, '=', val)
                 for fieldname, val in sale['part_ship'].items()
@@ -156,16 +165,17 @@ class AmazonSaleImporter(models.AbstractModel):
             shipping_line = float(line.get('shipping'))
             if shipping_line:
                 shipping_price += shipping_line
-            product = self.env['product.product'].search(
-                [('default_code', '=', line['default_code'])])
-            if product:
-                lines[line_count]['product_id'] = product.id
+            binding = self.env['amazon.product'].search(
+                [('external_id', '=', line['sku']),
+                 ('backend_id', '=', backend.id)])
+            if binding:
+                lines[line_count]['product_id'] = binding[0].record_id.id
             else:
-                products_in_exception.append(line['default_code'])
+                products_in_exception.append(line['sku'])
             line_count += 1
         if products_in_exception:
             raise UserError(
-                _("No matching product with these sku/default_code '%s'"
+                _("No matching product with these sku '%s' in Amazon binding"
                   % products_in_exception))
         return shipping_price
 
