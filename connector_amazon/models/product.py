@@ -3,7 +3,7 @@
 # @author Sébastien BEAU <sebastien.beau@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from openerp import fields, models
+from openerp import api, fields, models
 
 
 class ProductProduct(models.Model):
@@ -30,17 +30,20 @@ class AmazonProduct(models.Model):
     _description = 'Amazon Product'
 
     record_id = fields.Many2one(
-        comodel_name='product.product',
-        string='Product')
+        comodel_name='product.product', string='Product', required=True)
     external_id = fields.Char(
         string='SKU',
         help="Code/sku of the product in the marketplace")
     backend_id = fields.Many2one(
-        comodel_name='amazon.backend',
-        string='Backend',
-        required=True)
+        comodel_name='amazon.backend', string='Backend', required=True)
 
     _sql_constraints = [
         ('external_id_uniq', 'unique(backend_id, external_id)',
          'A product can only have one external id by backend.'),
     ]
+
+    @api.multi
+    @api.onchange('record_id')
+    def onchange_product(self):
+        for rec in self:
+            rec.external_id = rec.record_id.default_code

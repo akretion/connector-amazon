@@ -141,9 +141,9 @@ class AmazonSaleImporter(models.AbstractModel):
         sale['part_ship']['country_id'], sale['part_ship']['state_id'] = \
             self._get_state_country(sale)
         if partner:
-            # not existing street3 in odoo
             if sale['part_ship'].get('street3') and 'street3' not in \
                     partner_m._fields:
+                # if street3 doesn't exist in odoo: according to modules
                 sale['part_ship']['street2'] = '%s %s' % (
                     sale['part_ship']['street2'], sale['part_ship']['street3'])
             part_ship = partner_m.search([
@@ -160,6 +160,10 @@ class AmazonSaleImporter(models.AbstractModel):
         return (partner[0], part_ship[0])
 
     def _complete_products(self, lines, backend):
+        """ - check if product exist in amazon backend
+            - gather shipping price
+            return shipping_price
+        """
         line_count, shipping_price = 0, 0
         products_in_exception = []
         for line in lines:

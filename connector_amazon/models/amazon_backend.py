@@ -36,6 +36,8 @@ class AmazonBackend(models.Model):
         help="Prefix applied in Sale Order (field 'name')")
     pricelist_id = fields.Many2one(
         comodel_name='product.pricelist', string='Pricelist', required=True)
+    workflow_process_id = fields.Many2one(
+        comodel_name='sale.workflow.process', string='Worflow', required=True)
     accesskey = fields.Char(
         sparse="data", required=True, string="Access Key")
     merchant = fields.Char(

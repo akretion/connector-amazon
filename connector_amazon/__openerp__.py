@@ -24,7 +24,7 @@
         # Dependency on connector are just here for a better usability
         # Maybe we will remove it in the futur if it's problematic
         "connector_base_product",
-        "sale",
+        "sale_automatic_workflow",
         "base_sparse_field",
         "keychain",
         "attachment_base_synchronize",
