@@ -30,7 +30,8 @@ class AmazonProduct(models.Model):
     _description = 'Amazon Product'
 
     record_id = fields.Many2one(
-        comodel_name='product.product', string='Product', required=True)
+        comodel_name='product.product', string='Product', required=True,
+        ondelete='cascade')
     external_id = fields.Char(
         string='SKU',
         help="Code/sku of the product in the marketplace")

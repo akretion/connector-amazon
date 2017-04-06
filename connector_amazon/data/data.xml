@@ -11,7 +11,7 @@
         <field name="encoding">ISO-8859-15</field>
         <field name="accesskey">Your key</field>
         <field name="password">Your key</field>
-        <field name="worklow_process_id"
+        <field name="workflow_process_id"
                ref="sale_automatic_workflow.automatic_validation"/>
         <field name="shipping_product" ref="product.product_product_consultant"/>
         <field name="pricelist_id" ref="product.list0"/>
