@@ -29,8 +29,9 @@ install:
   - git clone https://github.com/OCA/maintainer-quality-tools.git ${HOME}/maintainer-quality-tools
   - export PATH=${HOME}/maintainer-quality-tools/travis:${PATH}
   - travis_install_nightly
-  - printf '[options]\n\nrunning_env = dev\n' > ${HOME}/.openerp_serverrc
-  - printf '[options]\n\nkeychain_key_dev = ZYXXxJJMu5mVY5UuRzTftq8sCZRa5ykKpORYmnd48dI=\n' > ${HOME}/.openerp_serverrc
+  - printf '[options]\n\n' > ${HOME}/.openerp_serverrc
+  - printf '\nrunning_env = dev\n' > ${HOME}/.openerp_serverrc
+  - printf '\nkeychain_key_dev = ZYXXxJJMu5mVY5UuRzTftq8sCZRa5ykKpORYmnd48dI=\n' > ${HOME}/.openerp_serverrc
   - git clone https://github.com/akretion/akretion-quality-tools ${HOME}/akretion-quality-tools
   - export PATH=${HOME}/akretion-quality-tools/travis:${PATH}
   - travis_configure
