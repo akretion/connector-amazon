@@ -58,7 +58,6 @@ class AmazonBackend(models.Model):
     encoding = fields.Selection(
         selection=[
             ('ISO-8859-15', 'ISO-8859-15'),
-            ('UTF-8', 'UTF-8'),
         ], required=True)
     import_report_from = fields.Datetime(string="Import From")
 

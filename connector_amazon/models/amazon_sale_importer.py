@@ -34,7 +34,10 @@ class AmazonSaleImporter(models.AbstractModel):
         reader.next()  # we pass the file header
         sales = self._extract_infos(reader)
         file.close()
-        return self._create_sales(sales, meta_attachment)
+        backend = meta_attachment.amazon_backend_id
+        for order_item, sale in sales.items():
+            self._create_sale(sale, order_item, meta_attachment, backend)
+        self._cr.commit()
 
     def _get_header_fieldnames(self):
         return [
@@ -96,63 +99,35 @@ class AmazonSaleImporter(models.AbstractModel):
             float(line['shipping-tax']),
         }
 
-    def _create_sales(self, sales, meta_attachment):
-        """ We process all sale orders of the file
+    def _create_sale(self, sale, order_item, meta_attachment, backend):
+        """ We process sale order of the file
         """
-        backend = meta_attachment.amazon_backend_id
-        for order_item, sale in sales.items():
-            partner, part_ship = self._get_partners(sale)
-            vals = {
-                'name': backend.sale_prefix or '' + sale['sale']['origin'],
-                'partner_id': partner.id,
-                'partner_shipping_id': part_ship.id,
-                'pricelist_id': backend.pricelist_id.id,
-                'external_origin': 'ir.attachment.metadata,%s'
-                % meta_attachment.id,
-                'origin': sale['sale']['origin'],
+        partner = self._get_customer(sale['partner'])
+        part_ship = self._get_delivery_address(
+            sale['part_ship'], sale['sale']['origin'], partner)
+        vals = {
+            'name': backend.sale_prefix or '' + sale['sale']['origin'],
+            'partner_id': partner.id,
+            'partner_shipping_id': part_ship.id,
+            'pricelist_id': backend.pricelist_id.id,
+            'external_origin': 'ir.attachment.metadata,%s'
+            % meta_attachment.id,
+            'origin': sale['sale']['origin'],
+        }
+        ship_price = self._prepare_products(sale['lines'], backend)
+        vals['order_line'] = [
+            (0, 0, {key: val for key, val in line.items()})
+            for line in sale['lines']]
+        if ship_price:
+            ship_vals = {
+                'product_uom_qty': 1,
+                'price_unit': ship_price,
+                'product_id': backend.shipping_product.id,
             }
-            ship_price = self._complete_products(sale['lines'], backend)
-            vals['order_line'] = [
-                (0, 0, {key: val for key, val in line.items()})
-                for line in sale['lines']]
-            if ship_price:
-                ship_vals = {
-                    'product_uom_qty': 1,
-                    'price_unit': ship_price,
-                    'product_id': backend.shipping_product.id,
-                }
-                vals['order_line'].append((0, 0, ship_vals), )
-            self.env['sale.order'].create(vals)
+            vals['order_line'].append((0, 0, ship_vals), )
+        self.env['sale.order'].create(vals)
 
-    def _get_partners(self, sale):
-        """ We have to search or create partners: main and shipping partner
-        """
-        partner_m = self.env['res.partner']
-        partner = partner_m.search(
-            [('email', '=', sale['partner']['email'])])
-        part_ship = False
-        sale['part_ship']['country_id'], sale['part_ship']['state_id'] = \
-            self._get_state_country(sale)
-        if partner:
-            if sale['part_ship'].get('street3') and 'street3' not in \
-                    partner_m._fields:
-                # if street3 doesn't exist in odoo: according to modules
-                sale['part_ship']['street2'] = '%s %s' % (
-                    sale['part_ship']['street2'], sale['part_ship']['street3'])
-            part_ship = partner_m.search([
-                (fieldname, '=', val)
-                for fieldname, val in sale['part_ship'].items()
-                if fieldname in partner_m._fields])
-        else:
-            partner = partner_m.create(sale['partner'])
-        if not part_ship:
-            sale['part_ship']['parent_id'] = partner.id
-            vals = {k: v for k, v in sale['part_ship'].items()
-                    if k in partner_m._fields}
-            part_ship = partner_m.create(vals)
-        return (partner[0], part_ship[0])
-
-    def _complete_products(self, lines, backend):
+    def _prepare_products(self, lines, backend):
         """ - check if product exist in amazon backend
             - gather shipping price
             return shipping_price
@@ -177,23 +152,52 @@ class AmazonSaleImporter(models.AbstractModel):
                   % ', '.join(products_in_exception)))
         return shipping_price
 
-    def _get_state_country(self, sale):
+    def _get_customer(self, customer_data):
+        partner_m = self.env['res.partner']
+        partner = partner_m.search(
+            [('email', '=', customer_data['email'])])
+        if not partner:
+            partner = partner_m.create(customer_data['partner'])
+        return partner[0]
+
+    def _get_delivery_address(self, part_ship, origin, partner):
+        partner_m = self.env['res.partner']
+        self._prepare_address(part_ship, origin)
+        address = partner_m.search([
+            (fieldname, '=', val)
+            for fieldname, val in part_ship.items()
+            if fieldname in partner_m._fields])
+        if not address:
+            part_ship['parent_id'] = partner.id
+            vals = {k: v for k, v in part_ship.items()
+                    if k in partner_m._fields}
+            partner = partner_m.create(vals)
+        return address[0]
+
+    def _prepare_address(self, part_ship, origin):
+        partner_m = self.env['res.partner']
+        part_ship['country_id'], part_ship['state_id'] = \
+            self._get_state_country(part_ship, origin)
+        if part_ship.get('street3') and 'street3' not in partner_m._fields:
+            # if street3 doesn't exist in odoo: according to modules
+            part_ship['street2'] = '%s %s' % (
+                part_ship['street2'], part_ship['street3'])
+
+    def _get_state_country(self, part_ship, origin):
         """ country is mandatory, not state
         """
         country = self.env['res.country'].search(
-            [('code', '=', sale['part_ship'].get('country'))])
-        if not country or not sale['part_ship'].get('country'):
+            [('code', '=', part_ship.get('country'))])
+        if not country or not part_ship.get('country'):
             raise UserError(
                 _("Unknow country code %s in sale %s " % (
-                    sale['part_ship'].get('code'),
-                    sale['sale']['origin'])))
+                    part_ship.get('code'), origin)))
         state = False
-        if sale['part_ship'].get('state'):
+        if part_ship.get('state'):
             state = self.env['res.country.state'].search(
-                [('code', '=', sale['part_ship'].get('state'))])
+                [('code', '=', part_ship.get('state'))])
             if not state:
                 raise UserError(
                     _("Unknown state code %s in sale %s " % (
-                        sale['part_ship'].get('state'),
-                        sale['sale']['origin'])))
+                        part_ship.get('state'), origin)))
         return(country.id, getattr(state, 'id', state))
