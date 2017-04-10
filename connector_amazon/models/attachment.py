@@ -6,7 +6,7 @@
 from openerp import fields, models
 import base64
 
-REPORT_SUPPORTED = {
+SUPPORTED_REPORT = {
     '_GET_FLAT_FILE_ORDERS_DATA_': 'Amazon Order',
     '_GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2_': 'Amazon Bank Statement',
 }
@@ -18,7 +18,7 @@ class IrAttachmentMetadata(models.Model):
     amazon_backend_id = fields.Many2one(
         comodel_name='amazon.backend', string='Amazon Backend')
     amazon_report_id = fields.Char(string="Amazon Report")
-    file_type = fields.Selection(selection_add=REPORT_SUPPORTED.items())
+    file_type = fields.Selection(selection_add=SUPPORTED_REPORT.items())
 
     _sql_constraints = [
         ('uniq_report_per_backend',

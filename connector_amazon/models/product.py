@@ -34,7 +34,7 @@ class AmazonProduct(models.Model):
         ondelete='cascade')
     external_id = fields.Char(
         string='SKU',
-        help="Code/sku of the product in the marketplace")
+        help="Code/SKU of the product in the marketplace")
     backend_id = fields.Many2one(
         comodel_name='amazon.backend', string='Backend', required=True)
 

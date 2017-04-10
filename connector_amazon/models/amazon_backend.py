@@ -9,7 +9,7 @@ import time
 from openerp import api, fields, models
 from openerp.exceptions import Warning as UserError
 
-from .attachment import REPORT_SUPPORTED
+from .attachment import SUPPORTED_REPORT
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -115,18 +115,20 @@ class AmazonBackend(models.Model):
         for record in self:
             try:
                 mws = record._get_connection()
-                kwargs = {'ReportTypeList': REPORT_SUPPORTED.keys()}
-                start = fields.Datetime.from_string(self.import_report_from)
-                if start:
-                    # Be carefull Amazon documentation is outdated
-                    # the key for filtering the date is AvailableFromDate
-                    # and not RequestedFromDate
-                    kwargs['AvailableFromDate'] = start.isoformat()
-                stop = None
+            except Exception as e:
+                mws = False
+                raise UserError(u"Amazon response:\n\n%s" % e)
+            kwargs = {'ReportTypeList': SUPPORTED_REPORT.keys()}
+            start = fields.Datetime.from_string(self.import_report_from)
+            if start:
+                # Be carefull Amazon documentation is outdated
+                # the key for filtering the date is AvailableFromDate
+                # and not RequestedFromDate
+                kwargs['AvailableFromDate'] = start.isoformat()
+            stop = None
+            if mws:
                 for response in mws.iter_call('GetReportList', **kwargs):
                     for report in response._result.ReportInfo:
                         self._import_report_id(mws, report)
                         stop = max(report.AvailableDate, stop)
                 record.import_report_from = iso8601.parse_date(stop)
-            except Exception as e:
-                raise UserError(u"Amazon response:\n\n%s" % e)

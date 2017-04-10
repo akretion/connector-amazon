@@ -24,7 +24,20 @@ class AmazonSaleImporter(models.AbstractModel):
     def _run(self, report, meta_attachment):
         """ Process the report and generate the sale order
         """
-        fieldnames = [
+        file = StringIO.StringIO()
+        file.write(report)
+        file.seek(0)
+        reader = unicodecsv.DictReader(
+            file, fieldnames=self._get_header_fieldnames(),
+            delimiter='\t', quoting=False,
+            encoding=meta_attachment.amazon_backend_id.encoding)
+        reader.next()  # we pass the file header
+        sales = self._extract_infos(reader)
+        file.close()
+        return self._create_sales(sales, meta_attachment)
+
+    def _get_header_fieldnames(self):
+        return [
             'order-id', 'order-item-id', 'purchase-date', 'payments-date',
             'buyer-email', 'buyer-name', 'buyer-phone-number', 'sku',
             'product-name', 'quantity-purchased', 'currency', 'item-price',
@@ -35,33 +48,17 @@ class AmazonSaleImporter(models.AbstractModel):
             'delivery-start-date', 'delivery-end-date',
             'delivery-time-zone', 'delivery-Instructions', 'sales-channel',
         ]
-        file = StringIO.StringIO()
-        file.write(report)
-        file.seek(0)
-        reader = unicodecsv.DictReader(
-            file, fieldnames=fieldnames, delimiter='\t', quoting=False,
-            encoding=meta_attachment.amazon_backend_id.encoding)
-        reader.next()  # we pass the file header
-        sales = self._extract_infos(reader)
-        file.close()
-        return self._create_sales(sales, meta_attachment)
 
     def _extract_infos(self, reader):
         sales = {}
-
-        def reset_empty(value):
-            if value == '':
-                return False
-            return value
-
         for line in reader:
             if not line.get('order-item-id'):
                 continue
             if line['order-id'] in sales:
-                vals = sales[line['order-id']]
-                vals['lines'].append(self._get_sale_line(line))
+                sales[line['order-id']]['lines'].append(
+                    self._get_sale_line(line))
             else:
-                vals = {
+                sales[line['order-id']] = {
                     'sale': {
                         'origin': line['order-id'],
                         'date_order': line['purchase-date'],
@@ -73,18 +70,18 @@ class AmazonSaleImporter(models.AbstractModel):
                     },
                     'part_ship': {
                         'name': line['recipient-name'],
-                        'phone': reset_empty(line['ship-phone-number']),
-                        'street': reset_empty(line['ship-address-1']),
-                        'street2': reset_empty(line['ship-address-2']),
-                        'street3': reset_empty(line['ship-address-3']),
+                        'type': 'delivery',
+                        'phone': line['ship-phone-number'],
+                        'street': line['ship-address-1'],
+                        'street2': line['ship-address-2'],
+                        'street3': line['ship-address-3'],
                         'city': line['ship-city'],
-                        'state': reset_empty(line['ship-state']),
-                        'zip': reset_empty(line['ship-postal-code']),
+                        'state': line['ship-state'],
+                        'zip': line['ship-postal-code'],
                         'country': line['ship-country'],
                     },
                     'lines': [self._get_sale_line(line)],
                 }
-            sales[line['order-id']] = vals
         return sales
 
     def _get_sale_line(self, line):
@@ -93,7 +90,7 @@ class AmazonSaleImporter(models.AbstractModel):
             'sku': line['sku'],
             'name': '[%s] %s' % (line['sku'], line['product-name']),
             'product_uom_qty': line['quantity-purchased'],
-            # price is in full tax, vat is computed in odoo
+            # price is in tax included, vat is computed in odoo
             'price_unit': float(line['item-price']) + float(line['item-tax']),
             'shipping': float(line['shipping-price']) + \
             float(line['shipping-tax']),
@@ -106,9 +103,7 @@ class AmazonSaleImporter(models.AbstractModel):
         for order_item, sale in sales.items():
             partner, part_ship = self._get_partners(sale)
             vals = {
-                'name': '%s %s' % (
-                    backend.sale_prefix or '',
-                    sale['sale']['origin']),
+                'name': backend.sale_prefix or '' + sale['sale']['origin'],
                 'partner_id': partner.id,
                 'partner_shipping_id': part_ship.id,
                 'pricelist_id': backend.pricelist_id.id,
@@ -116,19 +111,17 @@ class AmazonSaleImporter(models.AbstractModel):
                 % meta_attachment.id,
                 'origin': sale['sale']['origin'],
             }
-            if sale.get('lines'):
-                ship_price = self._complete_products(sale['lines'], backend)
-                vals['order_line'] = [
-                    (0, '_', {key: val for key, val in line.items()})
-                    for line in sale['lines']]
-                if ship_price:
-                    # import pdb; pdb.set_trace()
-                    ship_vals = {
-                        'product_uom_qty': 1,
-                        'price_unit': ship_price,
-                        'product_id': backend.shipping_product.id,
-                    }
-                    vals['order_line'].append((0, '_', ship_vals), )
+            ship_price = self._complete_products(sale['lines'], backend)
+            vals['order_line'] = [
+                (0, 0, {key: val for key, val in line.items()})
+                for line in sale['lines']]
+            if ship_price:
+                ship_vals = {
+                    'product_uom_qty': 1,
+                    'price_unit': ship_price,
+                    'product_id': backend.shipping_product.id,
+                }
+                vals['order_line'].append((0, 0, ship_vals), )
             self.env['sale.order'].create(vals)
 
     def _get_partners(self, sale):
@@ -181,7 +174,7 @@ class AmazonSaleImporter(models.AbstractModel):
         if products_in_exception:
             raise UserError(
                 _("No matching product with these sku '%s' in Amazon binding"
-                  % products_in_exception))
+                  % ', '.join(products_in_exception)))
         return shipping_price
 
     def _get_state_country(self, sale):
