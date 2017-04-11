@@ -37,7 +37,7 @@ class AmazonBackend(models.Model):
     pricelist_id = fields.Many2one(
         comodel_name='product.pricelist', string='Pricelist', required=True)
     workflow_process_id = fields.Many2one(
-        comodel_name='sale.workflow.process', string='Worflow', required=True)
+        comodel_name='sale.workflow.process', string='Workflow', required=True)
     accesskey = fields.Char(
         sparse="data", required=True, string="Access Key")
     merchant = fields.Char(

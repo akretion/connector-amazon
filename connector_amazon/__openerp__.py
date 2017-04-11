@@ -41,6 +41,7 @@
     ],
     "demo": [
         'demo/demo.xml',
+        'demo/amazon.product.csv',
     ],
     "qweb": [
     ]

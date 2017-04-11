@@ -93,7 +93,7 @@ class AmazonSaleImporter(models.AbstractModel):
             'sku': line['sku'],
             'name': '[%s] %s' % (line['sku'], line['product-name']),
             'product_uom_qty': line['quantity-purchased'],
-            # price is in tax included, vat is computed in odoo
+            # price is tax included, vat is computed in odoo
             'price_unit': float(line['item-price']) + float(line['item-tax']),
             'shipping': float(line['shipping-price']) + \
             float(line['shipping-tax']),
@@ -106,7 +106,7 @@ class AmazonSaleImporter(models.AbstractModel):
         part_ship = self._get_delivery_address(
             sale['part_ship'], sale['sale']['origin'], partner)
         vals = {
-            'name': backend.sale_prefix or '' + sale['sale']['origin'],
+            'name': (backend.sale_prefix or '') + sale['sale']['origin'],
             'partner_id': partner.id,
             'partner_shipping_id': part_ship.id,
             'pricelist_id': backend.pricelist_id.id,
@@ -157,7 +157,7 @@ class AmazonSaleImporter(models.AbstractModel):
         partner = partner_m.search(
             [('email', '=', customer_data['email'])])
         if not partner:
-            partner = partner_m.create(customer_data['partner'])
+            partner = partner_m.create(customer_data)
         return partner[0]
 
     def _get_delivery_address(self, part_ship, origin, partner):
@@ -171,7 +171,7 @@ class AmazonSaleImporter(models.AbstractModel):
             part_ship['parent_id'] = partner.id
             vals = {k: v for k, v in part_ship.items()
                     if k in partner_m._fields}
-            partner = partner_m.create(vals)
+            address = partner_m.create(vals)
         return address[0]
 
     def _prepare_address(self, part_ship, origin):
