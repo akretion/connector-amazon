@@ -16,5 +16,4 @@ class SaleOrder(models.Model):
         """ Inherit this method to add more models depending of your
             modules dependencies
         """
-        return [('amazon.backend', 'Amazon'),
-                ('ir.attachment.metadata', 'Attachment Metadata')]
+        return [('ir.attachment.metadata', 'Attachment Metadata')]

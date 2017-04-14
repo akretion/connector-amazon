@@ -12,7 +12,7 @@
         <field name="accesskey">Your key</field>
         <field name="password">Your key</field>
         <field name="workflow_process_id"
-               ref="sale_automatic_workflow.automatic_validation"/>
+               ref="sale_automatic_workflow.manual_validation"/>
         <field name="shipping_product" ref="product.product_product_consultant"/>
         <field name="pricelist_id" ref="product.list0"/>
     </record>

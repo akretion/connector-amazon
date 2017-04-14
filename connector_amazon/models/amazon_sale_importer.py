@@ -37,7 +37,6 @@ class AmazonSaleImporter(models.AbstractModel):
         backend = meta_attachment.amazon_backend_id
         for order_item, sale in sales.items():
             self._create_sale(sale, order_item, meta_attachment, backend)
-        self._cr.commit()
 
     def _get_header_fieldnames(self):
         return [
@@ -116,8 +115,10 @@ class AmazonSaleImporter(models.AbstractModel):
         }
         ship_price = self._prepare_products(sale['lines'], backend)
         vals['order_line'] = [
-            (0, 0, {key: val for key, val in line.items()})
-            for line in sale['lines']]
+            (0, 0, {key: val for key, val in line.items()
+                    if key in self.env['sale.order.line']._fields.keys()})
+            for line in sale['lines']
+        ]
         if ship_price:
             ship_vals = {
                 'product_uom_qty': 1,
@@ -163,10 +164,16 @@ class AmazonSaleImporter(models.AbstractModel):
     def _get_delivery_address(self, part_ship, origin, partner):
         partner_m = self.env['res.partner']
         self._prepare_address(part_ship, origin)
-        address = partner_m.search([
+        domain = [
+            '|',
+            ('active', '=', True),
+            ('active', '=', False)]
+        domain.extend([
             (fieldname, '=', val)
             for fieldname, val in part_ship.items()
             if fieldname in partner_m._fields])
+        # we search identical partner active or not
+        address = partner_m.search(domain)
         if not address:
             part_ship['parent_id'] = partner.id
             vals = {k: v for k, v in part_ship.items()

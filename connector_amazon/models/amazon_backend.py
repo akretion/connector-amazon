@@ -24,6 +24,9 @@ except ImportError:
     _logger.debug('Cannot `import boto` library.')
 
 
+KEYCHAIN_HELP = "Data store by keychain (Settings > Configuration > Keychain)"
+
+
 class AmazonBackend(models.Model):
     _name = 'amazon.backend'
     _inherit = 'keychain.backend'
@@ -35,18 +38,23 @@ class AmazonBackend(models.Model):
         string='Sale Prefix',
         help="Prefix applied in Sale Order (field 'name')")
     pricelist_id = fields.Many2one(
-        comodel_name='product.pricelist', string='Pricelist', required=True)
+        comodel_name='product.pricelist', string='Pricelist', required=True,
+        help="Pricelist used in imported sales")
     workflow_process_id = fields.Many2one(
-        comodel_name='sale.workflow.process', string='Workflow', required=True)
+        comodel_name='sale.workflow.process', string='Workflow', required=True,
+        help="Choose the right workflow to directly confirm the sale or not")
     accesskey = fields.Char(
-        sparse="data", required=True, string="Access Key")
+        sparse="data", required=True, string="Access Key",
+        help=KEYCHAIN_HELP)
     merchant = fields.Char(
-        sparse="data", required=True)
+        sparse="data", required=True, help=KEYCHAIN_HELP)
     marketplace = fields.Char(
-        sparse="data", required=True)
+        sparse="data", required=True, help=KEYCHAIN_HELP)
     shipping_product = fields.Many2one(
         comodel_name='product.product', string='Shipping Product',
-        required=True)
+        required=True,
+        help="Choose an appropriate product (accounting settings) to store "
+             "shipping fee")
     host = fields.Selection(
         selection=[
             ('mws.amazonservices.com', 'North America (NA)'),

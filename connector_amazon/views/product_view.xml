@@ -2,29 +2,62 @@
 <openerp>
 <data>
 
-<record id="view_product_template_form" model="ir.ui.view">
-    <field name="model">product.template</field>
-    <field name="inherit_id" ref="connector_base_product.product_template_common_form"/>
-    <field name="arch" type="xml">
-        <page name="connector" position="attributes">
-            <attribute name="invisible">0</attribute>
-        </page>
-        <page name="connector" position="inside">
-            <group name="amazon_product" string="Amazon Binding">
-                <field name="amazon_variant_bind_ids" nolabel="1">
-                    <tree editable="bottom">
-                        <field name="backend_id"/>
-                        <field name="record_id"
-                               options="{'create': false, 'create_edit': false}"
-                               domain="[('product_tmpl_id', '=', parent.id)]"
-                            />
-                        <field name="external_id"/>
-                    </tree>
-                </field>
-            </group>
-        </page>
-    </field>
-</record>
+    <record id="product_template_only_form_view" model="ir.ui.view">
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="priority" eval="20"/>
+        <field name="arch" type="xml">
+            <page name="connector" position="attributes">
+                <attribute name="invisible">0</attribute>
+            </page>
+            <page name="connector" position="inside">
+                <group name="amazon_product" string="Amazon Binding">
+                    <button type="object" name="populate_amazon_binding"
+                            string="Populate" colspan="4"/>
+                    <field name="amazon_variant_bind_ids" nolabel="1">
+                        <tree editable="bottom">
+                            <field name="backend_id"/>
+                            <field name="record_id" required="True"
+                                   options="{'create': false, 'create_edit': false}"
+                                   domain="[('product_tmpl_id', '=', parent.id)]"
+                                />
+                            <field name="external_id"/>
+                        </tree>
+                    </field>
+                </group>
+            </page>
+        </field>
+    </record>
+
+
+    <record id="product_normal_form_view" model="ir.ui.view">
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="connector_base_product.product_normal_form_view"/>
+        <field name="arch" type="xml">
+            <page name="connector" position="attributes">
+                <attribute name="invisible">0</attribute>
+            </page>
+            <page name="connector" position="inside">
+                <group name="amazon_product" string="Amazon Binding">
+                    <div class="oe_edit_only" colspan="4">
+                        Please edit binding on Product Templates
+                    </div>
+                    <field name="amazon_variant_bind_ids" nolabel="1" readonly="1">
+                        <!-- TODO improve view to only display concerned product -->
+                        <tree editable="bottom">
+                            <field name="backend_id"/>
+                            <field name="record_id"
+                                   options="{'create': false, 'create_edit': false}"
+                                   domain="[('id', '=', parent.id)]"
+                                />
+                            <field name="external_id"/>
+                        </tree>
+                    </field>
+                </group>
+            </page>
+        </field>
+    </record>
+
 
 </data>
 </openerp>
