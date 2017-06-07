@@ -193,18 +193,19 @@ class AmazonSaleImporter(models.AbstractModel):
     def _get_state_country(self, part_ship, origin):
         """ country is mandatory, not state
         """
-        country = self.env['res.country'].search(
-            [('code', '=', part_ship.get('country'))])
-        if not country or not part_ship.get('country'):
+        country_code = part_ship.get('country')
+        state_name = part_ship.get('state')
+        country = self.env['res.country'].search([('code', '=', country_code)])
+        if not country or not country_code:
             raise UserError(
-                _("Unknow country code %s in sale %s " % (
-                    part_ship.get('code'), origin)))
+                _("Unknow country code %s in sale %s ") % (
+                    country_code, origin))
         state = False
-        if part_ship.get('state'):
+        if state_name:
             state = self.env['res.country.state'].search(
-                [('code', '=', part_ship.get('state'))])
+                [('name', '=', state_name)])
             if not state:
                 raise UserError(
-                    _("Unknown state code %s in sale %s " % (
-                        part_ship.get('state'), origin)))
+                    _("Unknown state code %s in sale %s ") % (
+                        state_name, origin))
         return(country.id, getattr(state, 'id', state))
