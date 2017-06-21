@@ -138,4 +138,9 @@ class AmazonBackend(models.Model):
                     for report in response._result.ReportInfo:
                         self._import_report_id(mws, report)
                         stop = max(report.AvailableDate, stop)
+                if not stop:
+                    _logger.warning(
+                        "There are no Amazon reports for the backend '%s'",
+                        record.name)
+                    continue
                 record.import_report_from = iso8601.parse_date(stop)
