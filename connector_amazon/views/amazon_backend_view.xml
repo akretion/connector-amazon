@@ -21,11 +21,20 @@
                     <field name="name" class="oe_inline"/>
                 </h1>
                 <group string="Configuration" name="config">
-                    <field name="host"/>
-                    <field name="marketplace"/>
-                    <field name="merchant"/>
-                    <field name="accesskey"/>
-                    <field name="password" String="Secret Key"/>
+                    <group>
+                        <field name="host"/>
+                        <field name="pricelist_id"/>
+                        <field name="sale_prefix"/>
+                        <field name="shipping_product"/>
+                        <field name="workflow_process_id"/>
+                        <field name="encoding"/>
+                    </group>
+                    <group>
+                        <field name="marketplace"/>
+                        <field name="merchant"/>
+                        <field name="accesskey"/>
+                        <field name="password" String="Secret Key"/>
+                    </group>
                 </group>
                 <group string="Action" name="action" colrow="40">
                         <field name="import_report_from"/>
@@ -46,7 +55,7 @@
 </record>
 
 <record model="ir.actions.act_window" id="act_open_amazon_backend_view">
-    <field name="name">Backend</field>
+    <field name="name">Backends</field>
     <field name="type">ir.actions.act_window</field>
     <field name="res_model">amazon.backend</field>
     <field name="view_type">form</field>
@@ -71,7 +80,7 @@
 </record>
 
 <record model="ir.actions.act_window" id="act_open_amazon_file_view">
-    <field name="name">File</field>
+    <field name="name">Files</field>
     <field name="type">ir.actions.act_window</field>
     <field name="res_model">ir.attachment.metadata</field>
     <field name="view_type">form</field>

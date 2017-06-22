@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openerp>
+<data>
+
+    <record id="amazon_sale_demo" model="ir.attachment.metadata">
+        <field name="name">Amazon Sales file example</field>
+        <field name="state">pending</field>
+        <field name="type">binary</field>
+        <field name="file_type">_GET_FLAT_FILE_ORDERS_DATA_</field>
+        <field name="datas" type="base64" file="connector_amazon/demo/56460amz.csv"/>
+        <field name="datas_fname">56460amz</field>
+        <field name="amazon_backend_id" ref="connector_amazon.amazon_main_backend"/>
+        <field name="amazon_report_id">56460amz</field>
+    </record>
+
+    <record id="amazon_sale_demo2" model="ir.attachment.metadata">
+        <field name="name">Amazon Sales big file</field>
+        <field name="state">pending</field>
+        <field name="type">binary</field>
+        <field name="file_type">_GET_FLAT_FILE_ORDERS_DATA_</field>
+        <field name="datas" type="base64"
+               file="connector_amazon/demo/5724843814017999.csv"/>
+        <field name="datas_fname">5724843814017999</field>
+        <field name="amazon_backend_id" ref="connector_amazon.amazon_main_backend"/>
+        <field name="amazon_report_id">5724843814017999</field>
+    </record>
+
+    <record id="amazon_sale_demo3" model="ir.attachment.metadata">
+        <field name="name">Amazon Sales fail file</field>
+        <field name="state">pending</field>
+        <field name="type">binary</field>
+        <field name="file_type">_GET_FLAT_FILE_ORDERS_DATA_</field>
+        <field name="datas" type="base64"
+               file="connector_amazon/demo/fail_file_5554017999.csv"/>
+        <field name="datas_fname">5554017999</field>
+        <field name="amazon_backend_id" ref="connector_amazon.amazon_main_backend"/>
+        <field name="amazon_report_id">5554017999</field>
+    </record>
+
+</data>
+</openerp>

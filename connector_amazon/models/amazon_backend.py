@@ -7,19 +7,24 @@ import base64
 import time
 
 from openerp import api, fields, models
-from .attachment import REPORT_SUPPORTED
+from openerp.exceptions import Warning as UserError
+
+from .attachment import SUPPORTED_REPORT
 import logging
 _logger = logging.getLogger(__name__)
 
 try:
     import iso8601
 except ImportError:
-    _logger.debug('Cannot `import iso8601`.')
+    _logger.debug('Cannot `import iso8601` library.')
 
 try:
     from boto.mws.connection import MWSConnection
 except ImportError:
-    _logger.debug('Cannot `import boto`.')
+    _logger.debug('Cannot `import boto` library.')
+
+
+KEYCHAIN_HELP = "Data store by keychain (Settings > Configuration > Keychain)"
 
 
 class AmazonBackend(models.Model):
@@ -29,16 +34,27 @@ class AmazonBackend(models.Model):
     _report_per_page = 50
 
     name = fields.Char()
+    sale_prefix = fields.Char(
+        string='Sale Prefix',
+        help="Prefix applied in Sale Order (field 'name')")
+    pricelist_id = fields.Many2one(
+        comodel_name='product.pricelist', string='Pricelist', required=True,
+        help="Pricelist used in imported sales")
+    workflow_process_id = fields.Many2one(
+        comodel_name='sale.workflow.process', string='Workflow', required=True,
+        help="Choose the right workflow to directly confirm the sale or not")
     accesskey = fields.Char(
-        sparse="data",
-        required=True,
-        string="Access Key")
+        sparse="data", required=True, string="Access Key",
+        help=KEYCHAIN_HELP)
     merchant = fields.Char(
-        sparse="data",
-        required=True)
+        sparse="data", required=True, help=KEYCHAIN_HELP)
     marketplace = fields.Char(
-        sparse="data",
-        required=True)
+        sparse="data", required=True, help=KEYCHAIN_HELP)
+    shipping_product = fields.Many2one(
+        comodel_name='product.product', string='Shipping Product',
+        required=True,
+        help="Choose an appropriate product (accounting settings) to store "
+             "shipping fee")
     host = fields.Selection(
         selection=[
             ('mws.amazonservices.com', 'North America (NA)'),
@@ -46,8 +62,11 @@ class AmazonBackend(models.Model):
             ('mws.amazonservices.in', 'India (IN)'),
             ('mws.amazonservices.com.cn', 'China (CN)'),
             ('mws.amazonservices.jp', 'Japan (JP)'),
-            ],
-        required=True)
+        ], required=True)
+    encoding = fields.Selection(
+        selection=[
+            ('ISO-8859-15', 'ISO-8859-15'),
+        ], required=True)
     import_report_from = fields.Datetime(string="Import From")
 
     def _get_connection(self):
@@ -68,7 +87,7 @@ class AmazonBackend(models.Model):
             'sync_date': iso8601.parse_date(report.AvailableDate),
             'file_type': report.ReportType,
             'amazon_backend_id': self.id,
-            }
+        }
 
     @api.multi
     def _import_report_id(self, mws, report):
@@ -101,8 +120,12 @@ class AmazonBackend(models.Model):
     @api.multi
     def import_report(self):
         for record in self:
-            mws = record._get_connection()
-            kwargs = {'ReportTypeList': REPORT_SUPPORTED.keys()}
+            try:
+                mws = record._get_connection()
+            except Exception as e:
+                mws = False
+                raise UserError(u"Amazon response:\n\n%s" % e)
+            kwargs = {'ReportTypeList': SUPPORTED_REPORT.keys()}
             start = fields.Datetime.from_string(self.import_report_from)
             if start:
                 # Be carefull Amazon documentation is outdated
@@ -110,8 +133,14 @@ class AmazonBackend(models.Model):
                 # and not RequestedFromDate
                 kwargs['AvailableFromDate'] = start.isoformat()
             stop = None
-            for response in mws.iter_call('GetReportList', **kwargs):
-                for report in response._result.ReportInfo:
-                    self._import_report_id(mws, report)
-                    stop = max(report.AvailableDate, stop)
-            record.import_report_from = iso8601.parse_date(stop)
+            if mws:
+                for response in mws.iter_call('GetReportList', **kwargs):
+                    for report in response._result.ReportInfo:
+                        self._import_report_id(mws, report)
+                        stop = max(report.AvailableDate, stop)
+                if not stop:
+                    _logger.warning(
+                        "There are no Amazon reports for the backend '%s'",
+                        record.name)
+                    continue
+                record.import_report_from = iso8601.parse_date(stop)

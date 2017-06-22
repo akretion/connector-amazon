@@ -1,3 +1,4 @@
 ak-odoo-incubator https://github.com/akretion/ak-odoo-incubator.git 8.0
 connector
+sale-workflow
 web
