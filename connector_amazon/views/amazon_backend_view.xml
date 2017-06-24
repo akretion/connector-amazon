@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <openerp>
-    <data>
+<data>
 
 <record id="amazon_backend_view_tree" model="ir.ui.view">
     <field name="model">amazon.backend</field>
@@ -36,9 +36,13 @@
                         <field name="password" String="Secret Key"/>
                     </group>
                 </group>
-                <group string="Action" name="action" colrow="40">
-                        <field name="import_report_from"/>
-                        <button name="import_report" type="object" string="Import Report"/>
+                <group string="Actions" name="action" col="4">
+                    <span><u>Sales to deliver:</u></span>
+                    <button name="import_report" type="object" string="Import"/>
+                    <field name="import_report_from" string="From"/>
+                    <span><u>Delivered sales (FBA):</u></span>
+                    <button name="import_fba_delivered_sales" type="object" string="Import"/>
+                    <field name="import_fba_from" string="From"/>
                 </group>
             </sheet>
         </form>
@@ -105,5 +109,5 @@
     sequence="30"
     action="act_open_amazon_file_view"/>
 
-    </data>
+</data>
 </openerp>

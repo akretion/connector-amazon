@@ -6,7 +6,7 @@
 import base64
 import time
 
-from openerp import api, fields, models
+from openerp import _, api, fields, models
 from openerp.exceptions import Warning as UserError
 
 from .attachment import SUPPORTED_REPORT
@@ -67,16 +67,25 @@ class AmazonBackend(models.Model):
         selection=[
             ('ISO-8859-15', 'ISO-8859-15'),
         ], required=True)
-    import_report_from = fields.Datetime(string="Import From")
+    import_report_from = fields.Datetime(
+        string="Import From", required=True, default=fields.datetime.today(),
+        help="Import sales to deliver from this date.")
+    import_fba_from = fields.Datetime(
+        string="Import FBA From", required=True,
+        default=fields.datetime.today(),
+        help="Import Fulfillment by Amazon sales from this date.")
 
     def _get_connection(self):
         self.ensure_one()
         account = self._get_existing_keychain()
-        return MWSConnection(
-            self.accesskey,
-            account.get_password(),
-            Merchant=self.merchant,
-            host=self.host)
+        try:
+            return MWSConnection(
+                self.accesskey,
+                account.get_password(),
+                Merchant=self.merchant,
+                host=self.host)
+        except Exception as e:
+            raise UserError(u"Amazon response:\n\n%s" % e)
 
     def _prepare_attachment(self, report):
         return {
@@ -120,11 +129,7 @@ class AmazonBackend(models.Model):
     @api.multi
     def import_report(self):
         for record in self:
-            try:
-                mws = record._get_connection()
-            except Exception as e:
-                mws = False
-                raise UserError(u"Amazon response:\n\n%s" % e)
+            mws = record._get_connection()
             kwargs = {'ReportTypeList': SUPPORTED_REPORT.keys()}
             start = fields.Datetime.from_string(self.import_report_from)
             if start:
@@ -144,3 +149,172 @@ class AmazonBackend(models.Model):
                         record.name)
                     continue
                 record.import_report_from = iso8601.parse_date(stop)
+
+    @api.multi
+    def _create_sale(self, sale, meta_attachment=None):
+        """ We process sale order of the file
+        """
+        self.ensure_one()
+        partner = self._get_customer(sale['partner'])
+        part_ship = self._get_delivery_address(
+            sale['part_ship'], sale['sale']['origin'], partner)
+        vals = {
+            'name': (self.sale_prefix or '') + sale['sale']['origin'],
+            'partner_id': partner.id,
+            'partner_shipping_id': part_ship.id,
+            'pricelist_id': self.pricelist_id.id,
+            'origin': sale['sale']['origin'],
+        }
+        if meta_attachment:
+            vals['external_origin'] = 'ir.attachment.metadata,%s' \
+                                      % meta_attachment.id
+        ship_price = self._prepare_products(sale['lines'])
+        vals['order_line'] = [
+            (0, 0, {key: val for key, val in line.items()
+                    if key in self.env['sale.order.line']._fields.keys()})
+            for line in sale['lines']
+        ]
+        if ship_price:
+            ship_vals = {
+                'product_uom_qty': 1,
+                'price_unit': ship_price,
+                'product_id': self.shipping_product.id,
+            }
+            vals['order_line'].append((0, 0, ship_vals), )
+        self.env['sale.order'].create(vals)
+
+    def _get_customer(self, customer_data):
+        partner_m = self.env['res.partner']
+        partner = partner_m.search(
+            [('email', '=', customer_data['email'])])
+        if not partner:
+            partner = partner_m.create(customer_data)
+        return partner[0]
+
+    def _get_delivery_address(self, part_ship, origin, partner):
+        partner_m = self.env['res.partner']
+        self._prepare_address(part_ship, origin)
+        domain = [
+            '|',
+            ('active', '=', True),
+            ('active', '=', False)]
+        domain.extend([
+            (fieldname, '=', val)
+            for fieldname, val in part_ship.items()
+            if fieldname in partner_m._fields])
+        # we search identical partner active or not
+        address = partner_m.search(domain)
+        if not address:
+            part_ship['parent_id'] = partner.id
+            vals = {k: v for k, v in part_ship.items()
+                    if k in partner_m._fields}
+            address = partner_m.create(vals)
+        return address[0]
+
+    def _prepare_address(self, part_ship, origin):
+        partner_m = self.env['res.partner']
+        part_ship['country_id'], part_ship['state_id'] = \
+            self._get_state_country(part_ship, origin)
+        if part_ship.get('street3') and 'street3' not in partner_m._fields:
+            # if street3 doesn't exist in odoo: according to modules
+            part_ship['street2'] = '%s %s' % (
+                part_ship['street2'], part_ship['street3'])
+
+    def _prepare_products(self, lines):
+        """ - check if product exist in amazon backend
+            - gather shipping price
+            return shipping_price
+        """
+        line_count, shipping_price = 0, 0
+        products_in_exception = []
+        for line in lines:
+            shipping_line = float(line.get('shipping'))
+            if shipping_line:
+                shipping_price += shipping_line
+            binding = self.env['amazon.product'].search(
+                [('external_id', '=', line['sku']),
+                 ('backend_id', '=', self.id)])
+            if binding:
+                lines[line_count]['product_id'] = binding[0].record_id.id
+            else:
+                products_in_exception.append(line['sku'])
+            line_count += 1
+        if products_in_exception:
+            raise UserError(
+                _("No matching product with these sku '%s' in Amazon binding"
+                  % ', '.join(products_in_exception)))
+        return shipping_price
+
+    def _get_state_country(self, part_ship, origin):
+        """ country is mandatory, not state
+        """
+        country_code = part_ship.get('country')
+        state_name = part_ship.get('state')
+        country = self.env['res.country'].search([('code', '=', country_code)])
+        if not country or not country_code:
+            raise UserError(
+                _("Unknow country code %s in sale %s ") % (
+                    country_code, origin))
+        state = False
+        if state_name:
+            state = self.env['res.country.state'].search(
+                [('name', '=', state_name)])
+            if not state:
+                raise UserError(
+                    _("Unknown state code %s in sale %s ") % (
+                        state_name, origin))
+        return(country.id, getattr(state, 'id', state))
+
+    @api.multi
+    def import_fba_delivered_sales(self):
+        """ Import from Fulfillment by Amazon
+        """
+        for record in self:
+            mws = record._get_connection()
+            start = fields.Datetime.from_string(self.import_fba_from)
+            sales = mws.list_orders(
+                CreatedAfter=start.isoformat(), OrderStatus=['Shipped'],
+                # marketplace must be in a list: weird Amazon !
+                MarketplaceId=[record.marketplace])
+            print 'Nbr:', len(sales.ListOrdersResult.Orders.Order)
+            for order in sales.ListOrdersResult.Orders.Order:
+                data = mws.get_order(AmazonOrderId=order.AmazonOrderId)
+                print data
+                sale_items = mws.list_order_items(
+                    AmazonOrderId=order.AmazonOrderId)
+                print sale_items
+                self._create_sale(self._import_fba_sale(order))
+                # import pdb; pdb.set_trace()
+
+    @api.multi
+    def _import_fba_sale(self, order):
+        self.ensure_one()
+        sale = {
+            'sale': {
+                'origin': order.AmazonOrderId,
+                'date_order': order.PurchaseDate,
+            },
+            'partner': {
+                'email': order.BuyerEmail,
+                'name': order.BuyerName,
+                'phone': False,
+            },
+            'part_ship': {
+                'name': order.ShippingAddress.Name,
+                'type': 'delivery',
+                'phone': False,
+                'street': getattr(
+                    order.ShippingAddress, 'AddressLine1', False),
+                'street2': getattr(
+                    order.ShippingAddress, 'AddressLine2', False),
+                'street3': getattr(
+                    order.ShippingAddress, 'AddressLine3', False),
+                'city': order.ShippingAddress.City,
+                # Check which keys is submitted by amazon
+                'state': getattr(order.ShippingAddress, 'State', False),
+                'zip': order.ShippingAddress.PostalCode,
+                'country': order.ShippingAddress.CountryCode,
+            },
+            'lines': False
+        }
+        return sale
