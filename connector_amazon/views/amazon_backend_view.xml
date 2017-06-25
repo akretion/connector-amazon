@@ -34,15 +34,25 @@
                         <field name="merchant"/>
                         <field name="accesskey"/>
                         <field name="password" String="Secret Key"/>
+                        <field name="fba"/>
                     </group>
                 </group>
+                <group string="Fulfillment By Amazon" name="fba" col="3"
+                       attrs="{'invisible': [('fba', '=', False)]}">
+                    <field name="fba_warehouse_id" required="True"/>
+                    <span/>
+                </group>
                 <group string="Actions" name="action" col="4">
-                    <span><u>Sales to deliver:</u></span>
-                    <button name="import_report" type="object" string="Import"/>
-                    <field name="import_report_from" string="From"/>
-                    <span><u>Delivered sales (FBA):</u></span>
-                    <button name="import_fba_delivered_sales" type="object" string="Import"/>
-                    <field name="import_fba_from" string="From"/>
+                    <group>
+                        <span><u>Sales to deliver:</u></span>
+                        <button name="import_report" type="object" string="Import"/>
+                        <field name="import_report_from" string="From"/>
+                        </group>
+                    <group attrs="{'invisible': [('fba', '=', False)]}">
+                        <span><u>Delivered sales (FBA):</u></span>
+                        <button name="import_fba_delivered_sales" type="object" string="Import"/>
+                        <field name="import_fba_from" string="From"/>
+                    </group>
                 </group>
             </sheet>
         </form>

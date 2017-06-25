@@ -8,7 +8,6 @@ import StringIO
 import logging
 
 from openerp import models
-# from openerp.exceptions import Warning as UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -37,7 +36,10 @@ class AmazonSaleImporter(models.AbstractModel):
         file.close()
         backend = meta_attachment.amazon_backend_id
         for item in sales:
-            backend._create_sale(sales[item], meta_attachment)
+            sales[item]['auto_insert'].update({
+                'external_origin': 'ir.attachment.metadata,%s'
+                % meta_attachment.id})
+            backend._create_sale(sales[item])
 
     def _get_header_fieldnames(self):
         return [
@@ -62,7 +64,9 @@ class AmazonSaleImporter(models.AbstractModel):
                     self._get_sale_line(line))
             else:
                 sales[line['order-id']] = {
-                    'sale': {
+                    'auto_insert': {
+                        # these values will be inserted
+                        # if matching field exists in the ERP
                         'origin': line['order-id'],
                         'date_order': line['purchase-date'],
                     },

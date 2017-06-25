@@ -20,6 +20,7 @@ except ImportError:
 
 try:
     from boto.mws.connection import MWSConnection
+    from boto.exception import BotoServerError
 except ImportError:
     _logger.debug('Cannot `import boto` library.')
 
@@ -33,7 +34,7 @@ class AmazonBackend(models.Model):
     _backend_name = 'amazon'
     _report_per_page = 50
 
-    name = fields.Char()
+    name = fields.Char(required=True)
     sale_prefix = fields.Char(
         string='Sale Prefix',
         help="Prefix applied in Sale Order (field 'name')")
@@ -70,10 +71,15 @@ class AmazonBackend(models.Model):
     import_report_from = fields.Datetime(
         string="Import From", required=True, default=fields.datetime.today(),
         help="Import sales to deliver from this date.")
+    fba = fields.Boolean(
+        string='Fulfillment By Amazon',
+        help="Allow to access to Fulfillment by Amazon features.")
     import_fba_from = fields.Datetime(
         string="Import FBA From", required=True,
         default=fields.datetime.today(),
         help="Import Fulfillment by Amazon sales from this date.")
+    fba_warehouse_id = fields.Many2one(
+        comodel_name='stock.warehouse', string='Amazon FBA warehouse')
 
     def _get_connection(self):
         self.ensure_one()
@@ -151,23 +157,19 @@ class AmazonBackend(models.Model):
                 record.import_report_from = iso8601.parse_date(stop)
 
     @api.multi
-    def _create_sale(self, sale, meta_attachment=None):
+    def _create_sale(self, sale):
         """ We process sale order of the file
         """
         self.ensure_one()
         partner = self._get_customer(sale['partner'])
         part_ship = self._get_delivery_address(
-            sale['part_ship'], sale['sale']['origin'], partner)
+            sale['part_ship'], sale['auto_insert']['origin'], partner)
         vals = {
-            'name': (self.sale_prefix or '') + sale['sale']['origin'],
+            'name': (self.sale_prefix or '') + sale['auto_insert']['origin'],
             'partner_id': partner.id,
             'partner_shipping_id': part_ship.id,
             'pricelist_id': self.pricelist_id.id,
-            'origin': sale['sale']['origin'],
         }
-        if meta_attachment:
-            vals['external_origin'] = 'ir.attachment.metadata,%s' \
-                                      % meta_attachment.id
         ship_price = self._prepare_products(sale['lines'])
         vals['order_line'] = [
             (0, 0, {key: val for key, val in line.items()
@@ -181,7 +183,19 @@ class AmazonBackend(models.Model):
                 'product_id': self.shipping_product.id,
             }
             vals['order_line'].append((0, 0, ship_vals), )
+        if 'auto_insert' in sale:
+            # used by these fields: date_order, origin, external_origin,
+            # warehouse_id, ...
+            for field in sale['auto_insert']:
+                if field in self.env['sale.order']._fields:
+                    vals[field] = sale['auto_insert'][field]
         self.env['sale.order'].create(vals)
+        if 'warehouse_id' in sale['auto_insert']:
+            # We are in FBA
+            self.import_fba_from = vals['date_order']
+            # We commit to avoid than a fail sale import
+            # prevent to save other valid sales
+            self._cr.commit()
 
     def _get_customer(self, customer_data):
         partner_m = self.env['res.partner']
@@ -272,27 +286,36 @@ class AmazonBackend(models.Model):
         for record in self:
             mws = record._get_connection()
             start = fields.Datetime.from_string(self.import_fba_from)
-            sales = mws.list_orders(
-                CreatedAfter=start.isoformat(), OrderStatus=['Shipped'],
-                # marketplace must be in a list: weird Amazon !
-                MarketplaceId=[record.marketplace])
-            print 'Nbr:', len(sales.ListOrdersResult.Orders.Order)
-            for order in sales.ListOrdersResult.Orders.Order:
-                data = mws.get_order(AmazonOrderId=order.AmazonOrderId)
-                print data
-                sale_items = mws.list_order_items(
-                    AmazonOrderId=order.AmazonOrderId)
-                print sale_items
-                self._create_sale(self._import_fba_sale(order))
-                # import pdb; pdb.set_trace()
+            try:
+                sales = mws.list_orders(
+                    CreatedAfter=start.isoformat(), OrderStatus=['Shipped'],
+                    # marketplace must be in a list: weird Amazon !
+                    MarketplaceId=[record.marketplace])
+                _logger.info('%s FBA amazon sales will be imported',
+                             len(sales.ListOrdersResult.Orders.Order))
+                for order in sales.ListOrdersResult.Orders.Order:
+                    self._create_sale(self._import_fba_sale(mws, order))
+                    # Break is to avoid trigger Amz exception
+                    # Must be remove from final version
+                    break
+            except BotoServerError as bs:
+                # TODO manage this use case
+                # raise self._response_error_factory(bs.status, bs.reason, bs.body)
+                # RequestThrottled: RequestThrottled: Service Unavailable
+                # Request is throttled
+                print "\n\n\n"
+                print bs.status, bs.reason, bs.body
+            except Exception as e:
+                print "\n\n\n", e.message
 
     @api.multi
-    def _import_fba_sale(self, order):
+    def _import_fba_sale(self, mws, order):
         self.ensure_one()
         sale = {
-            'sale': {
+            'auto_insert': {
                 'origin': order.AmazonOrderId,
                 'date_order': order.PurchaseDate,
+                'warehouse_id': self.fba_warehouse_id.id,
             },
             'partner': {
                 'email': order.BuyerEmail,
@@ -315,6 +338,45 @@ class AmazonBackend(models.Model):
                 'zip': order.ShippingAddress.PostalCode,
                 'country': order.ShippingAddress.CountryCode,
             },
-            'lines': False
         }
+        items = mws.list_order_items(
+            AmazonOrderId=order.AmazonOrderId)
+        lines = []
+        for item in items.__dict__['ListOrderItemsResult'] \
+                .OrderItems.OrderItem:
+            line = {
+                'item': item.OrderItemId,
+                'sku': item.SellerSKU,
+                'name': '[%s] %s' % (item.SellerSKU, item.Title),
+                'product_uom_qty': item.QuantityOrdered,
+                # price is tax included, vat is computed in odoo
+                'price_unit': extract_money(item.ItemPrice, self, item) + \
+                extract_money(item.ItemTax),
+                'shipping': extract_money(item.ShippingPrice) + \
+                extract_money(item.ShippingTax),
+            }
+            lines.append(line)
+        sale['lines'] = lines
         return sale
+
+
+def extract_money(field, backend=None, item=None):
+    """ field is <class 'boto.mws.response.ComplexMoney'>
+        TODO Try to manage currency conversion
+    """
+    if field is None:
+        return 0.0
+    if backend:
+        if field.__dict__['CurrencyCode'] != \
+                backend.pricelist_id.currency_id.name:
+            raise UserError(
+                _("Currency '%(item_currency)s' used by SKU '%(sku)s' "
+                  "is different than currency '%(pricelist_currency)s' "
+                  "used by Pricelist of the backend '%(backend)s'.\n"
+                  "Import in this case in not yet supported" %
+                  {'item_currency': field.__dict__['CurrencyCode'],
+                   'sku': item.SellerSKU,
+                   'pricelist_currency': backend.pricelist_id.currency_id.name,
+                   'backend': backend.name,
+                   }))
+    return float(field.__dict__['Amount'])
