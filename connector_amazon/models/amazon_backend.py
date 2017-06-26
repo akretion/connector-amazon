@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 Akretion (http://www.akretion.com).
 # @author Sébastien BEAU <sebastien.beau@akretion.com>
+# @author David BEAL <david.beal@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 import base64
@@ -26,24 +27,27 @@ except ImportError:
 
 
 KEYCHAIN_HELP = "Data store by keychain (Settings > Configuration > Keychain)"
+SECONDS_AFTER_EXCEPTION = 60
 
 
 class AmazonBackend(models.Model):
     _name = 'amazon.backend'
-    _inherit = 'keychain.backend'
+    _inherit = ['keychain.backend', 'mail.thread']
     _backend_name = 'amazon'
-    _report_per_page = 50
 
     name = fields.Char(required=True)
     sale_prefix = fields.Char(
-        string='Sale Prefix',
+        string='Sale Prefix', track_visibility='onchange',
         help="Prefix applied in Sale Order (field 'name')")
     pricelist_id = fields.Many2one(
-        comodel_name='product.pricelist', string='Pricelist', required=True,
+        comodel_name='product.pricelist', string='Pricelist',
+        required=True, track_visibility='onchange',
         help="Pricelist used in imported sales")
     workflow_process_id = fields.Many2one(
-        comodel_name='sale.workflow.process', string='Workflow', required=True,
-        help="Choose the right workflow to directly confirm the sale or not")
+        comodel_name='sale.workflow.process', string='Workflow',
+        required=True, track_visibility='onchange',
+        help="Choose the right workflow: probably the manual one "
+             "to check your data")
     accesskey = fields.Char(
         sparse="data", required=True, string="Access Key",
         help=KEYCHAIN_HELP)
@@ -53,7 +57,7 @@ class AmazonBackend(models.Model):
         sparse="data", required=True, help=KEYCHAIN_HELP)
     shipping_product = fields.Many2one(
         comodel_name='product.product', string='Shipping Product',
-        required=True,
+        required=True, track_visibility='onchange',
         help="Choose an appropriate product (accounting settings) to store "
              "shipping fee")
     host = fields.Selection(
@@ -63,11 +67,11 @@ class AmazonBackend(models.Model):
             ('mws.amazonservices.in', 'India (IN)'),
             ('mws.amazonservices.com.cn', 'China (CN)'),
             ('mws.amazonservices.jp', 'Japan (JP)'),
-        ], required=True)
+        ], required=True, track_visibility='onchange')
     encoding = fields.Selection(
         selection=[
             ('ISO-8859-15', 'ISO-8859-15'),
-        ], required=True)
+        ], required=True, track_visibility='onchange')
     import_report_from = fields.Datetime(
         string="Import From", required=True, default=fields.datetime.today(),
         help="Import sales to deliver from this date.")
@@ -79,7 +83,20 @@ class AmazonBackend(models.Model):
         default=fields.datetime.today(),
         help="Import Fulfillment by Amazon sales from this date.")
     fba_warehouse_id = fields.Many2one(
-        comodel_name='stock.warehouse', string='Amazon FBA warehouse')
+        comodel_name='stock.warehouse', string='FBA Warehouse',
+        track_visibility='onchange',
+        helper="Products are physically stored in an other location.\n"
+               "Define a dedicated warehouse for this case")
+    fba_workflow_process_id = fields.Many2one(
+        comodel_name='sale.workflow.process', string='FBA Workflow',
+        required=True, track_visibility='onchange',
+        help="Choose the right workflow: for FBA, the best workflow "
+             "is the automatic one \nbecause your sales "
+             "are delivered and paid")
+    elapsed_time = fields.Selection(selection=[
+        (5, '5 s'), (20, '20 s'), (40, '40 s')], default=5,
+        help="Time elasped between 2 FBA sales imports:\n"
+             "prevent to be throttled by Amazon")
 
     def _get_connection(self):
         self.ensure_one()
@@ -114,17 +131,9 @@ class AmazonBackend(models.Model):
             _logger.debug("Report %s already exist, skip it" % report.ReportId)
         else:
             _logger.debug("Import Report %s" % report.ReportId)
-            try:
-                data = mws.get_report(ReportId=report.ReportId)
-            except Exception, e:
-                if e.error_code == 'RequestThrottled':
-                    _logger.info(
-                        "Request Throttled, please wait before auto retrying")
-                    time.sleep(60)
-                    _logger.debug("Import Report %s" % report.ReportId)
-                    data = mws.get_report(ReportId=report.ReportId)
-                else:
-                    raise
+            data = mws_api_call(
+                mws, 'get_report', 'ReportId', report.ReportId,
+                "Import Report '%s'")
             vals = self._prepare_attachment(report)
             vals['datas'] = base64.encodestring(data)
             self.env['ir.attachment.metadata'].create(vals)
@@ -189,13 +198,7 @@ class AmazonBackend(models.Model):
             for field in sale['auto_insert']:
                 if field in self.env['sale.order']._fields:
                     vals[field] = sale['auto_insert'][field]
-        self.env['sale.order'].create(vals)
-        if 'warehouse_id' in sale['auto_insert']:
-            # We are in FBA
-            self.import_fba_from = vals['date_order']
-            # We commit to avoid than a fail sale import
-            # prevent to save other valid sales
-            self._cr.commit()
+        return self.env['sale.order'].create(vals)
 
     def _get_customer(self, customer_data):
         partner_m = self.env['res.partner']
@@ -235,7 +238,7 @@ class AmazonBackend(models.Model):
                 part_ship['street2'], part_ship['street3'])
 
     def _prepare_products(self, lines):
-        """ - check if product exist in amazon backend
+        """ - check if product exists in amazon backend
             - gather shipping price
             return shipping_price
         """
@@ -251,13 +254,21 @@ class AmazonBackend(models.Model):
             if binding:
                 lines[line_count]['product_id'] = binding[0].record_id.id
             else:
-                products_in_exception.append(line['sku'])
+                self._worry_about_product_in_exception(
+                    lines, products_in_exception, line_count)
             line_count += 1
         if products_in_exception:
-            raise UserError(
-                _("No matching product with these sku '%s' in Amazon binding"
-                  % ', '.join(products_in_exception)))
+            message = _(
+                "No matching product with these sku '%s' in Amazon binding"
+                % ', '.join(products_in_exception))
+            self.message_post(body=message, subtype='mail.mt_comment')
+            raise UserError(message)
         return shipping_price
+
+    def _worry_about_product_in_exception(
+            self, lines, products_in_exception, line_count):
+        """ You may implement your own procedure """
+        products_in_exception.append(lines[line_count]['sku'])
 
     def _get_state_country(self, part_ship, origin):
         """ country is mandatory, not state
@@ -294,19 +305,31 @@ class AmazonBackend(models.Model):
                 _logger.info('%s FBA amazon sales will be imported',
                              len(sales.ListOrdersResult.Orders.Order))
                 for order in sales.ListOrdersResult.Orders.Order:
-                    self._create_sale(self._import_fba_sale(mws, order))
-                    # Break is to avoid trigger Amz exception
-                    # Must be remove from final version
-                    break
+                    _logger.debug(order)
+                    data = self._import_fba_sale(mws, order)
+                    if self.env[('sale.order')].search([
+                            ('origin', '=', data['auto_insert']['origin'])]):
+                        continue
+                    sale_date = data['auto_insert']['date_order']
+                    self._create_sale(data)
+                    record.import_fba_from = iso8601.parse_date(sale_date)
+                    # We commit to avoid than a fail sale import
+                    # prevent to save other valid sales
+                    self._cr.commit()
+                    # prevent to be throttled by Amazon
+                    time.sleep(record.elapsed_time)
             except BotoServerError as bs:
-                # TODO manage this use case
-                # raise self._response_error_factory(bs.status, bs.reason, bs.body)
-                # RequestThrottled: RequestThrottled: Service Unavailable
-                # Request is throttled
-                print "\n\n\n"
-                print bs.status, bs.reason, bs.body
+                # pass
+                message = _('Amazon BotoServerError %s %s %s') % (
+                    bs.status, bs.reason, bs.body)
+                # TODO I need to commit message_post() action
+                # but older actions since last commit: how to do it ?
+                self.message_post(body=message, subtype='mail.mt_comment')
+                raise UserError(message)
             except Exception as e:
-                print "\n\n\n", e.message
+                message = "Amazon exception '%s'" % e.message
+                self.message_post(body=message, subtype='mail.mt_comment')
+                raise UserError(e.message)
 
     @api.multi
     def _import_fba_sale(self, mws, order):
@@ -339,11 +362,13 @@ class AmazonBackend(models.Model):
                 'country': order.ShippingAddress.CountryCode,
             },
         }
-        items = mws.list_order_items(
-            AmazonOrderId=order.AmazonOrderId)
+        items = mws_api_call(
+            mws, 'list_order_items', {'AmazonOrderId': order.AmazonOrderId},
+            "Import Sale '%s'")
         lines = []
         for item in items.__dict__['ListOrderItemsResult'] \
                 .OrderItems.OrderItem:
+            _logger.debug(item)
             line = {
                 'item': item.OrderItemId,
                 'sku': item.SellerSKU,
@@ -358,6 +383,33 @@ class AmazonBackend(models.Model):
             lines.append(line)
         sale['lines'] = lines
         return sale
+
+    @api.model
+    def _import_fba_sales(self):
+        """ Triggered by cron """
+        self.search([]).import_fba_delivered_sales()
+
+
+def mws_api_call(mws, method, kwargs, message):
+    """ called by:
+        - mws.list_order_items(AmazonOrderId=order.AmazonOrderId)
+        - mws.get_report(ReportId=report.ReportId)
+    """
+    try:
+        data = getattr(mws, method)(**kwargs)
+    except Exception as e:
+        if hasattr(e, 'error_code'):
+            if e.error_code == 'RequestThrottled':
+                _logger.info(
+                    "Request Throttled, please wait before auto retrying")
+                time.sleep(SECONDS_AFTER_EXCEPTION)
+                _logger.debug(message % kwargs[kwargs.keys[0]])
+                data = getattr(mws, method)(kwargs)
+            else:
+                raise UserError(e)
+        else:
+            raise UserError(e)
+    return data
 
 
 def extract_money(field, backend=None, item=None):
