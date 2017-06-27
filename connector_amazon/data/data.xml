@@ -17,5 +17,17 @@
         <field name="pricelist_id" ref="product.list0"/>
     </record>
 
+    <record id="amazon_fba_cron" model="ir.cron">
+        <field name="name">Amazon FBA sale import</field>
+        <field name="interval_number">2</field>
+        <field name="interval_type">hours</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="model">amazon.backend</field>
+        <field name="function">_import_fba_sales</field>
+        <field name="args">()</field>
+        <field name="active" eval="False"/>
+    </record>
+
 </data>
 </openerp>
