@@ -46,6 +46,8 @@ class AmazonBackend(models.Model):
     workflow_process_id = fields.Many2one(
         comodel_name='sale.workflow.process', string='Workflow',
         required=True, track_visibility='onchange',
+        default=lambda self: self.env.ref(
+            'sale_automatic_workflow.manual_validation'),
         help="Choose the right workflow: probably the manual one "
              "to check your data")
     accesskey = fields.Char(
@@ -83,16 +85,18 @@ class AmazonBackend(models.Model):
         default=fields.datetime.today(),
         help="Import Fulfillment by Amazon sales from this date.")
     fba_warehouse_id = fields.Many2one(
-        comodel_name='stock.warehouse', string='FBA Warehouse',
+        comodel_name='stock.warehouse', string='Warehouse',
         track_visibility='onchange',
         helper="Products are physically stored in an other location.\n"
                "Define a dedicated warehouse for this case")
     fba_workflow_process_id = fields.Many2one(
-        comodel_name='sale.workflow.process', string='FBA Workflow',
+        comodel_name='sale.workflow.process', string='Workflow',
         required=True, track_visibility='onchange',
+        default=lambda self: self.env.ref(
+            'sale_automatic_workflow.manual_validation'),
         help="Choose the right workflow: for FBA, the best workflow "
              "is the automatic one \nbecause your sales "
-             "are delivered and paid")
+             "are delivered and paid (default one is manual)")
     elapsed_time = fields.Selection(selection=[
         (5, '5 s'), (20, '20 s'), (40, '40 s')], default=5,
         help="Time elasped between 2 FBA sales imports:\n"
