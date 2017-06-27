@@ -98,7 +98,7 @@ class AmazonBackend(models.Model):
              "is the automatic one \nbecause your sales "
              "are delivered and paid (default one is manual)")
     elapsed_time = fields.Selection(selection=[
-        (5, '5 s'), (20, '20 s'), (40, '40 s')], default=5,
+        (2, '2 seconds'), (4, '4 seconds'), (6, '6 seconds')], default=4,
         help="Time elasped between 2 FBA sales imports:\n"
              "prevent to be throttled by Amazon")
 
@@ -310,7 +310,7 @@ class AmazonBackend(models.Model):
                              len(sales.ListOrdersResult.Orders.Order))
                 for order in sales.ListOrdersResult.Orders.Order:
                     _logger.debug(order)
-                    data = self._import_fba_sale(mws, order)
+                    data = self._extract_fba_sale(mws, order)
                     if self.env[('sale.order')].search([
                             ('origin', '=', data['auto_insert']['origin'])]):
                         continue
@@ -326,17 +326,13 @@ class AmazonBackend(models.Model):
                 # pass
                 message = _('Amazon BotoServerError %s %s %s') % (
                     bs.status, bs.reason, bs.body)
-                # TODO I need to commit message_post() action
-                # but older actions since last commit: how to do it ?
-                self.message_post(body=message, subtype='mail.mt_comment')
                 raise UserError(message)
             except Exception as e:
                 message = "Amazon exception '%s'" % e.message
-                self.message_post(body=message, subtype='mail.mt_comment')
                 raise UserError(e.message)
 
     @api.multi
-    def _import_fba_sale(self, mws, order):
+    def _extract_fba_sale(self, mws, order):
         self.ensure_one()
         sale = {
             'auto_insert': {
@@ -389,7 +385,7 @@ class AmazonBackend(models.Model):
         return sale
 
     @api.model
-    def _import_fba_sales(self):
+    def _extract_fba_sales(self):
         """ Triggered by cron """
         self.search([]).import_fba_delivered_sales()
 
@@ -418,7 +414,6 @@ def mws_api_call(mws, method, kwargs, message):
 
 def extract_money(field, backend=None, item=None):
     """ field is <class 'boto.mws.response.ComplexMoney'>
-        TODO Try to manage currency conversion
     """
     if field is None:
         return 0.0

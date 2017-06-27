@@ -64,6 +64,8 @@ class AmazonProduct(models.Model):
     _sql_constraints = [
         ('external_id_uniq', 'unique(backend_id, external_id)',
          'A product can only have one external id by backend.'),
+        ('product_backend_uniq', 'unique(backend_id, record_id)',
+         'Couple product / backend must be unique.'),
     ]
 
     @api.multi
