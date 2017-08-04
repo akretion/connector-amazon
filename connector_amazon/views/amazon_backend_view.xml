@@ -39,7 +39,7 @@
                 </group>
                 <group string="Fulfillment By Amazon: specific settings" name="fba" col="4"
                        attrs="{'invisible': [('fba', '=', False)]}">
-                    <field name="fba_warehouse_id" required="True"/>
+                    <field name="fba_warehouse_id" attrs="{'required': [('fba', '=', True)]}"/>
                     <field name="elapsed_time" required="True" widget="selection"/>
                     <field name="fba_workflow_process_id" required="True"/>
                 </group>

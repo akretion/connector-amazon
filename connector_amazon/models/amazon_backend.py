@@ -136,7 +136,7 @@ class AmazonBackend(models.Model):
         else:
             _logger.debug("Import Report %s" % report.ReportId)
             data = mws_api_call(
-                mws, 'get_report', 'ReportId', report.ReportId,
+                mws, 'get_report', {'ReportId': report.ReportId},
                 "Import Report '%s'")
             vals = self._prepare_attachment(report)
             vals['datas'] = base64.encodestring(data)

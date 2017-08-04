@@ -6,7 +6,7 @@
 {
     "name": "Connector Amazon",
     "summary": "Connector for selling on Amazon Marketplace",
-    "version": "8.0.1.0.0",
+    "version": "8.0.1.0.1",
     "category": "Sales",
     "website": "www.akretion.com",
     "author": " Akretion",
