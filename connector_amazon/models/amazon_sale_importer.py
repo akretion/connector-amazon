@@ -24,21 +24,23 @@ class AmazonSaleImporter(models.AbstractModel):
     def _run(self, report, meta_attachment):
         """ Process the report and generate the sale order
         """
+        backend = meta_attachment.amazon_backend_id
         file = StringIO.StringIO()
         file.write(report)
         file.seek(0)
         reader = unicodecsv.DictReader(
             file, fieldnames=self._get_header_fieldnames(),
             delimiter='\t', quoting=False,
-            encoding=meta_attachment.amazon_backend_id.encoding)
+            encoding=backend.encoding)
         reader.next()  # we pass the file header
         sales = self._extract_infos(reader)
         file.close()
-        backend = meta_attachment.amazon_backend_id
         for item in sales:
             sales[item]['auto_insert'].update({
                 'external_origin': 'ir.attachment.metadata,%s'
-                % meta_attachment.id})
+                    % meta_attachment.id,
+                'workflow_process_id': backend.workflow_process_id.id,
+                })
             backend._create_sale(sales[item])
 
     def _get_header_fieldnames(self):

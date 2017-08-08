@@ -101,6 +101,18 @@ class AmazonBackend(models.Model):
         (2, '2 seconds'), (4, '4 seconds'), (6, '6 seconds')], default=4,
         help="Time elasped between 2 FBA sales imports:\n"
              "prevent to be throttled by Amazon")
+    sale_journal_id = fields.Many2one(
+        'account.journal',
+        'Sale Journal')
+    fba_sale_journal_id = fields.Many2one(
+        'account.journal',
+        'Sale Journal')
+    receivable_account_id = fields.Many2one(
+        'account.account',
+        'Receivable Account')
+    fba_receivable_account_id = fields.Many2one(
+        'account.account',
+        'Fba Receivable Account')
 
     def _get_connection(self):
         self.ensure_one()
@@ -171,17 +183,26 @@ class AmazonBackend(models.Model):
 
     @api.multi
     def _create_sale(self, sale):
-        """ We process sale order of the file
-        """
+        """ We process sale order of the file"""
+        if sale['auto_insert'].get('is_amazon_fba'):
+            prefix = self.fba_sale_prefix or ''
+        else:
+            prefix = self.sale_prefix or ''
+        name = prefix + sale['auto_insert']['origin']
+        if self.env[('sale.order')].search([
+                ('origin', '=', name)]):
+            _logger.debug("Order %s already have been imported, skip it", name)
+            return
         self.ensure_one()
         partner = self._get_customer(sale['partner'])
         part_ship = self._get_delivery_address(
             sale['part_ship'], sale['auto_insert']['origin'], partner)
         vals = {
-            'name': (self.sale_prefix or '') + sale['auto_insert']['origin'],
+            'name': name,
             'partner_id': partner.id,
             'partner_shipping_id': part_ship.id,
             'pricelist_id': self.pricelist_id.id,
+            'amazon_backend_id': self.id,
         }
         ship_price = self._prepare_products(sale['lines'])
         vals['order_line'] = [
@@ -311,9 +332,6 @@ class AmazonBackend(models.Model):
                 for order in sales.ListOrdersResult.Orders.Order:
                     _logger.debug(order)
                     data = self._extract_fba_sale(mws, order)
-                    if self.env[('sale.order')].search([
-                            ('origin', '=', data['auto_insert']['origin'])]):
-                        continue
                     sale_date = data['auto_insert']['date_order']
                     self._create_sale(data)
                     record.import_fba_from = iso8601.parse_date(sale_date)
@@ -339,6 +357,7 @@ class AmazonBackend(models.Model):
                 'origin': order.AmazonOrderId,
                 'date_order': order.PurchaseDate,
                 'warehouse_id': self.fba_warehouse_id.id,
+                'is_amazon_fba': True,
             },
             'partner': {
                 'email': order.BuyerEmail,
