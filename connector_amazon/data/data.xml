@@ -29,5 +29,17 @@
         <field name="active" eval="False"/>
     </record>
 
+    <record id="amazon_cron" model="ir.cron">
+        <field name="name">Amazon report import</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="model">amazon.backend</field>
+        <field name="function">import_all_report</field>
+        <field name="args">()</field>
+        <field name="active" eval="False"/>
+    </record>
+
 </data>
 </openerp>
