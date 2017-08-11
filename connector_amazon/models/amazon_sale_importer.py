@@ -37,10 +37,10 @@ class AmazonSaleImporter(models.AbstractModel):
         file.close()
         for item in sales:
             sales[item]['auto_insert'].update({
-                'external_origin':
-                    'ir.attachment.metadata,%s' % meta_attachment.id,
+                'external_origin': 'ir.attachment.metadata,%s'
+                % meta_attachment.id,
                 'workflow_process_id': backend.workflow_process_id.id,
-                })
+            })
             backend._create_sale(sales[item])
 
     def _get_header_fieldnames(self):

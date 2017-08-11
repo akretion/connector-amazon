@@ -162,7 +162,7 @@ class AmazonBackend(models.Model):
         for record in self:
             mws = record._get_connection()
             kwargs = {'ReportTypeList': SUPPORTED_REPORT.keys()}
-            start = fields.Datetime.from_string(self.import_report_from)
+            start = fields.Datetime.from_string(record.import_report_from)
             if start:
                 # Be carefull Amazon documentation is outdated
                 # the key for filtering the date is AvailableFromDate
@@ -172,7 +172,7 @@ class AmazonBackend(models.Model):
             if mws:
                 for response in mws.iter_call('GetReportList', **kwargs):
                     for report in response._result.ReportInfo:
-                        self._import_report_id(mws, report)
+                        record._import_report_id(mws, report)
                         stop = max(report.AvailableDate, stop)
                 if not stop:
                     _logger.warning(
@@ -180,6 +180,12 @@ class AmazonBackend(models.Model):
                         record.name)
                     continue
                 record.import_report_from = iso8601.parse_date(stop)
+
+    @api.model
+    def import_all_report(self, domain=None):
+        if domain is None:
+            domain = []
+        self.search(domain).import_report()
 
     @api.multi
     def _create_sale(self, sale):
