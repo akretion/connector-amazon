@@ -97,6 +97,9 @@ class AmazonBackend(models.Model):
         help="Choose the right workflow: for FBA, the best workflow "
              "is the automatic one \nbecause your sales "
              "are delivered and paid (default one is manual)")
+    fba_sale_prefix = fields.Char(
+        string='Fba Sale Prefix', track_visibility='onchange',
+        help="Prefix applied in Sale Order (field 'name')")
     elapsed_time = fields.Selection(selection=[
         (2, '2 seconds'), (4, '4 seconds'), (6, '6 seconds')], default=4,
         help="Time elasped between 2 FBA sales imports:\n"
@@ -196,7 +199,7 @@ class AmazonBackend(models.Model):
             prefix = self.sale_prefix or ''
         name = prefix + sale['auto_insert']['origin']
         if self.env[('sale.order')].search([
-                ('origin', '=', name)]):
+                ('name', '=', name)]):
             _logger.debug("Order %s already have been imported, skip it", name)
             return
         self.ensure_one()
@@ -363,6 +366,7 @@ class AmazonBackend(models.Model):
                 'origin': order.AmazonOrderId,
                 'date_order': order.PurchaseDate,
                 'warehouse_id': self.fba_warehouse_id.id,
+                'workflow_process_id': self.fba_workflow_process_id.id,
                 'is_amazon_fba': True,
             },
             'partner': {
