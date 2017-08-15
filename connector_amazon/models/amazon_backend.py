@@ -414,9 +414,11 @@ class AmazonBackend(models.Model):
         return sale
 
     @api.model
-    def _extract_fba_sales(self):
+    def _import_fba_sales(self):
         """ Triggered by cron """
-        self.search([]).import_fba_delivered_sales()
+        self.search([
+            ('fba', '=', True)
+            ]).import_fba_delivered_sales()
 
 
 def mws_api_call(mws, method, kwargs, message):
