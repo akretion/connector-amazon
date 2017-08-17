@@ -330,7 +330,7 @@ class AmazonBackend(models.Model):
         """
         for record in self:
             mws = record._get_connection()
-            start = fields.Datetime.from_string(self.import_fba_from)
+            start = fields.Datetime.from_string(record.import_fba_from)
             try:
                 sales = mws.list_orders(
                     CreatedAfter=start.isoformat(), OrderStatus=['Shipped'],
@@ -340,13 +340,13 @@ class AmazonBackend(models.Model):
                              len(sales.ListOrdersResult.Orders.Order))
                 for order in sales.ListOrdersResult.Orders.Order:
                     _logger.debug(order)
-                    data = self._extract_fba_sale(mws, order)
+                    data = record._extract_fba_sale(mws, order)
                     sale_date = data['auto_insert']['date_order']
-                    self._create_sale(data)
+                    record._create_sale(data)
                     record.import_fba_from = iso8601.parse_date(sale_date)
                     # We commit to avoid than a fail sale import
                     # prevent to save other valid sales
-                    self._cr.commit()
+                    record._cr.commit()
                     # prevent to be throttled by Amazon
                     time.sleep(record.elapsed_time)
             except BotoServerError as bs:
