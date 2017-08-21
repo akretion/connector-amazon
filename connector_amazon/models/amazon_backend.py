@@ -317,11 +317,11 @@ class AmazonBackend(models.Model):
         state = False
         if state_name:
             state = self.env['res.country.state'].search(
-                [('name', '=', state_name)])
+                [('name', '=ilike', state_name)])
             if not state:
-                raise UserError(
-                    _("Unknown state code %s in sale %s ") % (
-                        state_name, origin))
+                _logger.debug(
+                    _("Unknown state name %s in sale %s, skip it")
+                    % (state_name, origin))
         return(country.id, getattr(state, 'id', state))
 
     @api.multi
