@@ -356,7 +356,7 @@ class AmazonBackend(models.Model):
                 raise UserError(message)
             except Exception as e:
                 message = "Amazon exception '%s'" % e.message
-                raise UserError(e.message)
+                raise UserError(e.message or e)
 
     @api.multi
     def _extract_fba_sale(self, mws, order):
@@ -371,7 +371,7 @@ class AmazonBackend(models.Model):
             },
             'partner': {
                 'email': order.BuyerEmail,
-                'name': order.BuyerName,
+                'name': order.BuyerName or order.ShippingAddress.Name,
                 'phone': False,
             },
             'part_ship': {
