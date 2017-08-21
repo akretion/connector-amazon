@@ -387,7 +387,7 @@ class AmazonBackend(models.Model):
                 'city': order.ShippingAddress.City,
                 # Check which keys is submitted by amazon
                 'state': getattr(order.ShippingAddress, 'State', False),
-                'zip': order.ShippingAddress.PostalCode,
+                'zip': getattr(order.ShippingAddress, 'PostalCode', ''),
                 'country': order.ShippingAddress.CountryCode,
             },
         }
