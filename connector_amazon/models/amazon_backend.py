@@ -333,7 +333,8 @@ class AmazonBackend(models.Model):
             start = fields.Datetime.from_string(record.import_fba_from)
             try:
                 sales = mws.list_orders(
-                    LastUpdatedAfter=start.isoformat(), OrderStatus=['Shipped'],
+                    LastUpdatedAfter=start.isoformat(),
+                    OrderStatus=['Shipped'],
                     # marketplace must be in a list: weird Amazon !
                     MarketplaceId=[record.marketplace])
                 _logger.info('%s FBA amazon sales will be imported',
@@ -342,7 +343,8 @@ class AmazonBackend(models.Model):
                     _logger.debug(order)
                     data = record._extract_fba_sale(mws, order)
                     record._create_sale(data)
-                    record.import_fba_from = iso8601.parse_date(order.LastUpdateDate)
+                    record.import_fba_from = iso8601.parse_date(
+                        order.LastUpdateDate)
                     # We commit to avoid than a fail sale import
                     # prevent to save other valid sales
                     record._cr.commit()
@@ -403,10 +405,14 @@ class AmazonBackend(models.Model):
                 'name': '[%s] %s' % (item.SellerSKU, item.Title),
                 'product_uom_qty': item.QuantityOrdered,
                 # price is tax included, vat is computed in odoo
-                'price_unit': extract_money(item.ItemPrice, self, item) + \
-                extract_money(item.ItemTax),
-                'shipping': extract_money(item.ShippingPrice) + \
-                extract_money(item.ShippingTax),
+                'price_unit': (
+                    extract_money(item.ItemPrice, self, item) +
+                    extract_money(item.ItemTax)
+                    ) / float(item.QuantityOrdered),
+                'shipping': (
+                    extract_money(item.ShippingPrice) +
+                    extract_money(item.ShippingTax)),
+                'discount': 0,
             }
             lines.append(line)
         sale['lines'] = lines
