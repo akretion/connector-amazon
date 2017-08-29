@@ -405,13 +405,12 @@ class AmazonBackend(models.Model):
                 'name': '[%s] %s' % (item.SellerSKU, item.Title),
                 'product_uom_qty': item.QuantityOrdered,
                 # price is tax included, vat is computed in odoo
-                'price_unit': (
-                    extract_money(item.ItemPrice, self, item) +
-                    extract_money(item.ItemTax)
-                    ) / float(item.QuantityOrdered),
+                'price_unit':
+                    extract_money(item.ItemPrice, self, item)\
+                    / float(item.QuantityOrdered),
                 'shipping': (
-                    extract_money(item.ShippingPrice) +
-                    extract_money(item.ShippingTax)),
+                    extract_money(item.ShippingPrice) -
+                    extract_money(item.ShippingDiscount)),
                 'discount': 0,
             }
             lines.append(line)
