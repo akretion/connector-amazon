@@ -411,6 +411,9 @@ class AmazonBackend(models.Model):
         lines = []
         for item in items.__dict__['ListOrderItemsResult'] \
                 .OrderItems.OrderItem:
+            if float(item.QuantityOrdered) == 0:
+                _logger.debug('Empty line skip it, %s', item)
+                continue
             _logger.debug(item)
             line = {
                 'item': item.OrderItemId,
