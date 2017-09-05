@@ -193,16 +193,10 @@ class AmazonBackend(models.Model):
     @api.multi
     def _create_sale(self, sale):
         """ We process sale order of the file"""
-        if sale['auto_insert'].get('is_amazon_fba'):
-            prefix = self.fba_sale_prefix or ''
-        else:
-            prefix = self.sale_prefix or ''
-        name = prefix + sale['auto_insert']['origin']
-        if self.env[('sale.order')].search([
-                ('name', '=', name)]):
-            _logger.debug("Order %s already have been imported, skip it", name)
-            return
         self.ensure_one()
+        name = self._build_sale_order_name(
+            sale['auto_insert']['origin'],
+            sale['auto_insert'].get('is_amazon_fba'))
         partner = self._get_customer(sale['partner'])
         part_ship = self._get_delivery_address(
             sale['part_ship'], sale['auto_insert']['origin'], partner)
@@ -324,6 +318,19 @@ class AmazonBackend(models.Model):
                     % (state_name, origin))
         return(country.id, getattr(state, 'id', state))
 
+    def _build_sale_order_name(self, name, is_fba=False):
+        if is_fba:
+            prefix = self.fba_sale_prefix or ''
+        else:
+            prefix = self.sale_prefix or ''
+        return prefix + name
+
+    def _should_skip_sale_order(self, order_name, is_fba=False):
+        name = self._build_sale_order_name(order_name, is_fba=is_fba)
+        if self.env[('sale.order')].search([('name', '=', name)]):
+            return True
+        return False
+
     @api.multi
     def import_fba_delivered_sales(self):
         """ Import from Fulfillment by Amazon
@@ -340,6 +347,12 @@ class AmazonBackend(models.Model):
                 _logger.info('%s FBA amazon sales will be imported',
                              len(sales.ListOrdersResult.Orders.Order))
                 for order in sales.ListOrdersResult.Orders.Order:
+                    if record._should_skip_sale_order(
+                            order.AmazonOrderId, is_fba=True):
+                        _logger.debug(
+                            "Order %s already have been imported, skip it",
+                            order.AmazonOrderId)
+                        continue
                     _logger.debug(order)
                     data = record._extract_fba_sale(mws, order)
                     record._create_sale(data)
