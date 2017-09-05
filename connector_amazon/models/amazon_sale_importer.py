@@ -36,11 +36,18 @@ class AmazonSaleImporter(models.AbstractModel):
         sales = self._extract_infos(reader)
         file.close()
         for item in sales:
-            sales[item]['auto_insert'].update({
+            sale = sales[item]
+            sale['auto_insert'].update({
                 'external_origin': 'ir.attachment.metadata,%s'
                 % meta_attachment.id,
                 'workflow_process_id': backend.workflow_process_id.id,
             })
+            if backend._should_skip_sale_order(
+                    sale['auto_insert']['origin'], is_fba=False):
+                _logger.debug(
+                    "Order %s already have been imported, skip it",
+                    sale['auto_insert']['origin'])
+                continue
             backend._create_sale(sales[item])
 
     def _get_header_fieldnames(self):
