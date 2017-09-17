@@ -346,7 +346,9 @@ class AmazonBackend(models.Model):
                     MarketplaceId=[record.marketplace])
                 _logger.info('%s FBA amazon sales will be imported',
                              len(sales.ListOrdersResult.Orders.Order))
+                max_date = None
                 for order in sales.ListOrdersResult.Orders.Order:
+                    max_date = max(max_date, order.LastUpdateDate)
                     if record._should_skip_sale_order(
                             order.AmazonOrderId, is_fba=True):
                         _logger.debug(
@@ -356,13 +358,13 @@ class AmazonBackend(models.Model):
                     _logger.debug(order)
                     data = record._extract_fba_sale(mws, order)
                     record._create_sale(data)
-                    record.import_fba_from = iso8601.parse_date(
-                        order.LastUpdateDate)
+                    # prevent to be throttled by Amazon
+                    time.sleep(record.elapsed_time)
+                if max_date:
+                    record.import_fba_from = iso8601.parse_date(max_date)
                     # We commit to avoid than a fail sale import
                     # prevent to save other valid sales
                     record._cr.commit()
-                    # prevent to be throttled by Amazon
-                    time.sleep(record.elapsed_time)
             except BotoServerError as bs:
                 # pass
                 message = _('Amazon BotoServerError %s %s %s') % (
