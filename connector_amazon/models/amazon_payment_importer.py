@@ -30,7 +30,11 @@ def s2f(val):
 
 
 def format_date(date_str):
-    date = datetime.strptime(date_str, '%d.%m.%Y %H:%M:%S %Z')
+    """ Depending of the country the date may do not have the same format"""
+    try:
+        date = datetime.strptime(date_str, '%d.%m.%Y %H:%M:%S %Z')
+    except:
+        date = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S %Z')
     return date.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
 
 
