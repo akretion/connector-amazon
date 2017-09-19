@@ -29,6 +29,7 @@
         "keychain",
         "attachment_base_synchronize",
         "web_m2x_options",
+        "account_move_so_import",
     ],
     "data": [
         "views/amazon_backend_view.xml",

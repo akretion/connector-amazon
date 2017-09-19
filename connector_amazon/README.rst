@@ -8,7 +8,8 @@ Supported features
 
 * Standard sales: sales to deliver
 * FBA sales: delivered sales
-
+* Bank statement import: please use the following branch for the module account_move_base_import, account_move_so_import :
+  https://github.com/akretion/bank-statement-reconcile/tree/8.0-move-import-backport
 
 Standard sales
 ---------------
