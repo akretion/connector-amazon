@@ -336,6 +336,7 @@ class AmazonBackend(models.Model):
                 sales = mws.list_orders(
                     LastUpdatedAfter=start.isoformat(),
                     OrderStatus=['Shipped'],
+                    FulfillmentChannel=["AFN"],
                     # marketplace must be in a list: weird Amazon !
                     MarketplaceId=[record.marketplace])
                 _logger.info('%s FBA amazon sales will be imported',
