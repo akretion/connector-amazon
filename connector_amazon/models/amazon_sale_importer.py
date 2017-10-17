@@ -108,9 +108,8 @@ class AmazonSaleImporter(models.AbstractModel):
             'product_uom_qty': line['quantity-purchased'],
             # price is tax included, vat is computed in odoo
             'price_unit':
-                (float(line['item-price']) + float(line['item-tax']))\
+                (float(line['item-price']))\
                 / float(line['quantity-purchased']),
-            'shipping': float(line['shipping-price']) + \
-            float(line['shipping-tax']),
+            'shipping': float(line['shipping-price']),
             'discount': 0,
         }
