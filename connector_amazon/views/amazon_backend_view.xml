@@ -29,6 +29,7 @@
                         <field name="workflow_process_id" widget="selection"/>
                         <field name="sale_journal_id" />
                         <field name="receivable_account_id"/>
+                        <field name="bank_journal_id"/>
                         <field name="encoding" widget="selection"/>
                     </group>
                     <group>
@@ -44,7 +45,6 @@
                     <field name="fba_warehouse_id" attrs="{'required': [('fba', '=', True)]}"/>
                     <field name="elapsed_time" required="True" widget="selection"/>
                     <field name="fba_workflow_process_id" required="True"/>
-                    <field name="fba_sale_prefix"/>
                     <field name="fba_sale_journal_id"/>
                     <field name="fba_receivable_account_id"/>
                 </group>

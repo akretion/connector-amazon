@@ -97,9 +97,6 @@ class AmazonBackend(models.Model):
         help="Choose the right workflow: for FBA, the best workflow "
              "is the automatic one \nbecause your sales "
              "are delivered and paid (default one is manual)")
-    fba_sale_prefix = fields.Char(
-        string='Fba Sale Prefix', track_visibility='onchange',
-        help="Prefix applied in Sale Order (field 'name')")
     elapsed_time = fields.Selection(selection=[
         (2, '2 seconds'), (4, '4 seconds'), (6, '6 seconds')], default=4,
         help="Time elasped between 2 FBA sales imports:\n"
@@ -116,6 +113,9 @@ class AmazonBackend(models.Model):
     fba_receivable_account_id = fields.Many2one(
         'account.account',
         'Fba Receivable Account')
+    bank_journal_id = fields.Many2one(
+        'account.journal',
+        'Bank Journal')
 
     def _get_connection(self):
         self.ensure_one()
@@ -194,9 +194,7 @@ class AmazonBackend(models.Model):
     def _create_sale(self, sale):
         """ We process sale order of the file"""
         self.ensure_one()
-        name = self._build_sale_order_name(
-            sale['auto_insert']['origin'],
-            sale['auto_insert'].get('is_amazon_fba'))
+        name = self._build_sale_order_name(sale['auto_insert']['origin'])
         partner = self._get_customer(sale['partner'])
         part_ship = self._get_delivery_address(
             sale['part_ship'], sale['auto_insert']['origin'], partner)
@@ -318,15 +316,11 @@ class AmazonBackend(models.Model):
                     % (state_name, origin))
         return(country.id, getattr(state, 'id', state))
 
-    def _build_sale_order_name(self, name, is_fba=False):
-        if is_fba:
-            prefix = self.fba_sale_prefix or ''
-        else:
-            prefix = self.sale_prefix or ''
-        return prefix + name
+    def _build_sale_order_name(self, name):
+        return (self.sale_prefix or '') + name
 
     def _should_skip_sale_order(self, order_name, is_fba=False):
-        name = self._build_sale_order_name(order_name, is_fba=is_fba)
+        name = self._build_sale_order_name(order_name)
         if self.env[('sale.order')].search([('name', '=', name)]):
             return True
         return False
@@ -342,6 +336,7 @@ class AmazonBackend(models.Model):
                 sales = mws.list_orders(
                     LastUpdatedAfter=start.isoformat(),
                     OrderStatus=['Shipped'],
+                    FulfillmentChannel=["AFN"],
                     # marketplace must be in a list: weird Amazon !
                     MarketplaceId=[record.marketplace])
                 _logger.info('%s FBA amazon sales will be imported',
