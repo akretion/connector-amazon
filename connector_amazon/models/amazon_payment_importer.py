@@ -47,7 +47,7 @@ class AmazonPaymentImporter(models.AbstractModel):
 
         backend = meta_attachment.amazon_backend_id
         # Create bank statement line for transferts
-        move = backend.bank_journal_id.with_context(
+        backend.bank_journal_id.with_context(
             file_name=meta_attachment.name, backend=backend)\
             .multi_move_import(meta_attachment.datas, 'csv')
 
