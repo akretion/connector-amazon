@@ -372,6 +372,11 @@ class AmazonBackend(models.Model):
     @api.multi
     def _extract_fba_sale(self, mws, order):
         self.ensure_one()
+        # Sometime Amazon do not have the BuyerName set !
+        if hasattr(order, 'BuyerName') and order.BuyerName:
+            partner_name = order.BuyerName
+        else:
+            partner_name = order.ShippingAddress.Name
         sale = {
             'auto_insert': {
                 'origin': order.AmazonOrderId,
@@ -382,7 +387,7 @@ class AmazonBackend(models.Model):
             },
             'partner': {
                 'email': order.BuyerEmail,
-                'name': order.BuyerName or order.ShippingAddress.Name,
+                'name': partner_name,
                 'phone': False,
             },
             'part_ship': {
