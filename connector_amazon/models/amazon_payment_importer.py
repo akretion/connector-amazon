@@ -108,6 +108,7 @@ class AmazonFlatV2Parser(FileParser):
                     'label': key,
                     'amount': vals,
                     'account_id': self.journal.commission_account_id.id,
+                    'partner_id': self.journal.partner_id.id,
                     })
         return res
 
@@ -129,6 +130,7 @@ class AmazonFlatV2Parser(FileParser):
             'amount': -s2f(first_line['total-amount']),
             'account_id': self.journal.default_debit_account_id.id,
             'period_id': self.period_id,
+            'partner_id': self.journal.partner_id.id,
             })
         result = self._merge_line(reader)
         self.result_row_list += self._convert_parsed_to_row(result)
@@ -143,4 +145,6 @@ class AmazonFlatV2Parser(FileParser):
             'debit': amount < 0.0 and -amount or 0.0,
             'period_id': self.period_id,
             'journal_id': self.journal.id,
-        }
+            'already_completed': bool(line.get('partner_id')),
+            'partner_id': line.get('partner_id') or False,
+            }
