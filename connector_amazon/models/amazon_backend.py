@@ -377,6 +377,7 @@ class AmazonBackend(models.Model):
             partner_name = order.BuyerName
         else:
             partner_name = order.ShippingAddress.Name
+        shipping_address = order.ShippingAddress.__dict__
         sale = {
             'auto_insert': {
                 'origin': order.AmazonOrderId,
@@ -391,20 +392,17 @@ class AmazonBackend(models.Model):
                 'phone': False,
             },
             'part_ship': {
-                'name': order.ShippingAddress.Name,
+                'name': shipping_address.get('Name'),
                 'type': 'delivery',
                 'phone': False,
-                'street': getattr(
-                    order.ShippingAddress, 'AddressLine1', False),
-                'street2': getattr(
-                    order.ShippingAddress, 'AddressLine2', False),
-                'street3': getattr(
-                    order.ShippingAddress, 'AddressLine3', False),
-                'city': order.ShippingAddress.City,
+                'street': shipping_address.get('AddressLine1'),
+                'street2': shipping_address.get('AddressLine2'),
+                'street3': shipping_address.get('AddressLine3'),
+                'city': shipping_address.get('City'),
                 # Check which keys is submitted by amazon
-                'state': getattr(order.ShippingAddress, 'State', False),
-                'zip': getattr(order.ShippingAddress, 'PostalCode', ''),
-                'country': order.ShippingAddress.CountryCode,
+                'state': shipping_address.get('State'),
+                'zip': shipping_address.get('PostalCode'),
+                'country': shipping_address.get('CountryCode'),
             },
         }
         items = mws_api_call(
