@@ -56,7 +56,9 @@ class AmazonBackend(models.Model):
     merchant = fields.Char(
         sparse="data", required=True, help=KEYCHAIN_HELP)
     marketplace = fields.Char(
-        sparse="data", required=True, help=KEYCHAIN_HELP)
+        sparse="data", required=True,
+        help="This is the api key of the marketplace used, you can"
+             "put many key splitted by a ';'")
     shipping_product = fields.Many2one(
         comodel_name='product.product', string='Shipping Product',
         required=True, track_visibility='onchange',
@@ -337,8 +339,7 @@ class AmazonBackend(models.Model):
                     LastUpdatedAfter=start.isoformat(),
                     OrderStatus=['Shipped'],
                     FulfillmentChannel=["AFN"],
-                    # marketplace must be in a list: weird Amazon !
-                    MarketplaceId=[record.marketplace])
+                    MarketplaceId=record.marketplace.split(';'))
                 _logger.info('%s FBA amazon sales will be imported',
                              len(sales.ListOrdersResult.Orders.Order))
                 max_date = None
