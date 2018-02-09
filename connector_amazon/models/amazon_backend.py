@@ -230,8 +230,10 @@ class AmazonBackend(models.Model):
 
     def _get_customer(self, customer_data):
         partner_m = self.env['res.partner']
-        partner = partner_m.search(
-            [('email', '=', customer_data['email'])])
+        partner = False
+        if customer_data['email']:
+            partner = partner_m.search(
+                [('email', '=', customer_data['email'])])
         if not partner:
             partner = partner_m.create(customer_data)
         return partner[0]
@@ -388,7 +390,7 @@ class AmazonBackend(models.Model):
                 'is_amazon_fba': True,
             },
             'partner': {
-                'email': order.BuyerEmail,
+                'email': order.__dict__.get('BuyerEmail'),
                 'name': partner_name,
                 'phone': False,
             },
