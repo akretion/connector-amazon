@@ -356,6 +356,7 @@ class AmazonBackend(models.Model):
                     _logger.debug(order)
                     data = record._extract_fba_sale(mws, order)
                     record._create_sale(data)
+                    record._cr.commit()
                     # prevent to be throttled by Amazon
                     time.sleep(record.elapsed_time)
                 if max_date:
