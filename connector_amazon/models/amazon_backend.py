@@ -458,7 +458,7 @@ def mws_api_call(mws, method, kwargs, message):
                 _logger.info(
                     "Request Throttled, please wait before auto retrying")
                 time.sleep(SECONDS_AFTER_EXCEPTION)
-                _logger.debug(message % kwargs[kwargs.keys[0]])
+                _logger.debug(message % kwargs[kwargs.keys()[0]])
                 data = getattr(mws, method)(kwargs)
             else:
                 raise UserError(e)
