@@ -381,7 +381,14 @@ class AmazonBackend(models.Model):
             partner_name = order.BuyerName
         else:
             partner_name = order.ShippingAddress.Name
-        shipping_address = order.ShippingAddress.__dict__
+        # HACK sometime amazon do not give the user address in US
+        # we need to found a better solution
+        if order.ShippingAddress is not None:
+            shipping_address = order.ShippingAddress.__dict__
+        elif order.OrderTotal.CurrencyCode == 'USD':
+            shipping_address = {'Name': partner_name, 'CountryCode': 'US'}
+        else:
+            raise Exception("Aucune adresse de livraison")
         sale = {
             'auto_insert': {
                 'origin': order.AmazonOrderId,
